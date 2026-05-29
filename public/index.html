@@ -1,0 +1,1057 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Drake Content × BLUETTI — Project Management</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f8fafc;--sidebar:#0f172a;--sidebar-hover:#1e293b;--sidebar-active:#1d4ed8;
+  --white:#fff;--border:#e2e8f0;--text:#1e293b;--muted:#64748b;--light:#f1f5f9;
+  --blue:#2563eb;--blue-light:#dbeafe;--green:#16a34a;--green-light:#dcfce7;
+  --amber:#d97706;--amber-light:#fef3c7;--red:#dc2626;--red-light:#fee2e2;
+  --purple:#7c3aed;--purple-light:#ede9fe;--teal:#0891b2;--teal-light:#cffafe;
+  --orange:#ea580c;--orange-light:#ffedd5;
+}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--text);font-size:14px}
+
+/* LOGIN */
+#login-screen{display:flex;align-items:center;justify-content:center;min-height:100vh;background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%)}
+.login-box{background:white;border-radius:16px;padding:44px;width:380px;box-shadow:0 25px 50px rgba(0,0,0,.35)}
+.login-logo{text-align:center;margin-bottom:32px}
+.login-logo .brand{font-size:20px;font-weight:800;color:#0f172a}
+.login-logo .sub{font-size:12px;color:var(--muted);margin-top:5px}
+.login-box h2{font-size:18px;font-weight:700;margin-bottom:6px}
+.login-box p{color:var(--muted);font-size:13px;margin-bottom:24px}
+.form-group{margin-bottom:16px}
+.form-group label{display:block;font-size:11px;font-weight:700;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em}
+.form-group input{width:100%;border:1.5px solid var(--border);border-radius:8px;padding:10px 14px;font-size:14px;outline:none;transition:border-color .2s}
+.form-group input:focus{border-color:var(--blue)}
+.btn-login{width:100%;background:var(--blue);color:white;border:none;border-radius:8px;padding:12px;font-size:14px;font-weight:600;cursor:pointer}
+.btn-login:hover{background:#1d4ed8}
+.login-error{color:var(--red);font-size:12px;margin-top:8px;display:none}
+
+/* APP SHELL */
+#app{display:none;min-height:100vh}
+.layout{display:flex;min-height:100vh}
+.sidebar{width:230px;background:var(--sidebar);flex-shrink:0;display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;overflow-y:auto;z-index:100}
+.sidebar-header{padding:20px 16px 16px;border-bottom:1px solid #1e293b}
+.sidebar-brand{font-size:13px;font-weight:800;color:white}
+.sidebar-client{font-size:11px;color:#64748b;margin-top:2px}
+.sidebar-mode{display:inline-block;font-size:10px;font-weight:600;padding:2px 8px;border-radius:10px;margin-top:6px}
+.mode-admin{background:#1d4ed8;color:white}
+.mode-team{background:#0891b2;color:white}
+.mode-client{background:#7c3aed;color:white}
+.sidebar-nav{padding:12px 8px;flex:1}
+.nav-section{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#475569;padding:12px 8px 6px}
+.nav-item{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;cursor:pointer;color:#94a3b8;font-size:13px;font-weight:500;transition:all .15s;margin-bottom:2px}
+.nav-item:hover{background:var(--sidebar-hover);color:white}
+.nav-item.active{background:var(--sidebar-active);color:white}
+.nav-icon{width:18px;text-align:center;font-size:15px;flex-shrink:0}
+.sidebar-footer{padding:12px 16px;border-top:1px solid #1e293b}
+.btn-logout{width:100%;background:transparent;border:1px solid #334155;color:#94a3b8;border-radius:8px;padding:8px;font-size:12px;cursor:pointer;margin-bottom:6px}
+.btn-logout:hover{background:#1e293b;color:white}
+.btn-reset{width:100%;background:transparent;border:1px solid #7f1d1d;color:#f87171;border-radius:8px;padding:7px;font-size:11px;cursor:pointer;display:none}
+.btn-reset:hover{background:#7f1d1d;color:white}
+
+/* MAIN */
+.main{margin-left:230px;display:flex;flex-direction:column;min-height:100vh}
+.topbar{background:white;border-bottom:1px solid var(--border);padding:14px 28px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50}
+.topbar-title{font-size:17px;font-weight:700}
+.topbar-date{font-size:12px;color:var(--muted)}
+#main-content{padding:24px 28px;flex:1}
+
+/* CARDS */
+.card{background:white;border:1px solid var(--border);border-radius:12px;margin-bottom:16px;overflow:hidden}
+.card-header{padding:16px 20px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border)}
+.card-title{font-size:15px;font-weight:700}
+.card-body{padding:16px 20px}
+.stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:20px}
+.stat-card{background:white;border:1px solid var(--border);border-radius:12px;padding:16px 20px}
+.stat-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:6px}
+.stat-value{font-size:28px;font-weight:800;line-height:1}
+.stat-sub{font-size:11px;color:var(--muted);margin-top:4px}
+
+/* TABLES */
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse}
+th{background:var(--light);text-align:left;padding:10px 14px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);border-bottom:1px solid var(--border)}
+td{padding:10px 14px;border-bottom:1px solid var(--border);vertical-align:top;font-size:13px}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:#fafafa}
+
+/* BADGES */
+.badge{display:inline-flex;align-items:center;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:600;white-space:nowrap}
+.badge-green{background:var(--green-light);color:var(--green)}
+.badge-blue{background:var(--blue-light);color:var(--blue)}
+.badge-amber{background:var(--amber-light);color:var(--amber)}
+.badge-red{background:var(--red-light);color:var(--red)}
+.badge-purple{background:var(--purple-light);color:var(--purple)}
+.badge-teal{background:var(--teal-light);color:var(--teal)}
+.badge-orange{background:var(--orange-light);color:var(--orange)}
+.badge-gray{background:var(--light);color:var(--muted)}
+
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;border:none;transition:all .15s}
+.btn-primary{background:var(--blue);color:white}.btn-primary:hover{background:#1d4ed8}
+.btn-outline{background:white;color:var(--text);border:1.5px solid var(--border)}.btn-outline:hover{background:var(--light)}
+.btn-ghost{background:transparent;color:var(--muted);padding:5px 8px;font-size:13px}.btn-ghost:hover{background:var(--light);color:var(--text)}
+.btn-sm{padding:4px 10px;font-size:12px;border-radius:6px}
+.drive-link{display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--blue);text-decoration:none;background:var(--blue-light);padding:3px 9px;border-radius:20px;font-weight:600}
+.drive-link:hover{background:#bfdbfe}
+
+/* FILTER BAR */
+.filter-bar{display:flex;gap:10px;margin-bottom:18px;flex-wrap:wrap;align-items:center}
+.filter-select{border:1.5px solid var(--border);border-radius:8px;padding:7px 12px;font-size:13px;background:white;cursor:pointer;outline:none}
+.filter-select:focus{border-color:var(--blue)}
+
+/* TABS */
+.tabs{display:flex;gap:4px;margin-bottom:20px;border-bottom:2px solid var(--border);flex-wrap:wrap}
+.tab{padding:10px 14px;font-size:13px;font-weight:600;cursor:pointer;color:var(--muted);border-radius:8px 8px 0 0;transition:all .15s;border-bottom:2px solid transparent;margin-bottom:-2px}
+.tab:hover{color:var(--text);background:var(--light)}
+.tab.active{color:var(--blue);border-bottom-color:var(--blue);background:var(--blue-light)}
+
+/* MODAL */
+#modal-overlay{display:none;position:fixed;inset:0;background:rgba(15,23,42,.6);z-index:200;align-items:center;justify-content:center;padding:20px}
+#modal-overlay.open{display:flex}
+#modal-box{background:white;border-radius:16px;width:100%;max-width:580px;max-height:90vh;overflow-y:auto;box-shadow:0 25px 60px rgba(0,0,0,.25)}
+#modal-content{padding:28px}
+.modal-title{font-size:18px;font-weight:700;margin-bottom:20px}
+.modal-field{margin-bottom:14px}
+.modal-field label{display:block;font-size:11px;font-weight:700;color:var(--muted);margin-bottom:5px;text-transform:uppercase;letter-spacing:.05em}
+.modal-field input,.modal-field select,.modal-field textarea{width:100%;border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;outline:none;transition:border-color .2s;font-family:inherit;background:white}
+.modal-field input:focus,.modal-field select:focus,.modal-field textarea:focus{border-color:var(--blue)}
+.modal-field textarea{resize:vertical}
+.field-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:24px;padding-top:20px;border-top:1px solid var(--border)}
+
+/* PROJECT CARDS */
+.project-card{background:white;border:1px solid var(--border);border-radius:12px;margin-bottom:14px;overflow:hidden}
+.project-card-header{padding:14px 18px;display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.project-card-title{font-size:15px;font-weight:700;margin-bottom:4px}
+.project-card-meta{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.deliverable-list{padding:0 18px 14px}
+.deliverable-item{display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid var(--light)}
+.deliverable-item:last-child{border-bottom:none}
+.deliverable-dot{width:6px;height:6px;border-radius:50%;background:var(--blue);flex-shrink:0;margin-top:6px}
+.deliverable-text{font-size:13px;line-height:1.5;flex:1}
+.deliverable-actions{display:flex;gap:4px;opacity:0;transition:opacity .15s;flex-shrink:0}
+.deliverable-item:hover .deliverable-actions{opacity:1}
+
+/* GOAL ITEMS */
+.goal-item{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)}
+.goal-item:last-child{border-bottom:none}
+.goal-cat-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.goal-desc{flex:1;font-size:13px}
+.goal-target{font-size:12px;font-weight:600;color:var(--muted);white-space:nowrap}
+
+/* ALERT */
+.alert{padding:12px 16px;border-radius:8px;font-size:13px;margin-bottom:16px}
+.alert-blue{background:var(--blue-light);color:#1e40af}
+
+/* CLIENT DASHBOARD */
+.client-month-header{background:var(--sidebar);color:white;border-radius:12px;padding:24px 28px;margin-bottom:24px}
+.client-month-title{font-size:22px;font-weight:800;margin-bottom:4px}
+.client-month-sub{font-size:13px;color:#94a3b8}
+.client-project-card{background:white;border:1px solid var(--border);border-radius:12px;margin-bottom:16px;overflow:hidden}
+.client-project-header{padding:16px 20px;background:var(--light);border-bottom:1px solid var(--border);display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.client-project-name{font-size:15px;font-weight:800;margin-bottom:4px}
+.client-deliverables{padding:12px 20px}
+.client-deliverable{display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid var(--light)}
+.client-deliverable:last-child{border-bottom:none}
+.client-dot{color:var(--blue);font-size:16px;flex-shrink:0;line-height:1.4}
+.client-total-bar{background:var(--sidebar);color:white;border-radius:12px;padding:18px 24px;display:flex;justify-content:space-between;align-items:center;margin-top:8px}
+
+/* ASSIGNEE TAGS */
+.assignee-tag{display:inline-flex;align-items:center;gap:5px;background:var(--light);border:1px solid var(--border);border-radius:20px;padding:4px 10px;font-size:12px;font-weight:500;margin:3px}
+.assignee-tag button{background:none;border:none;cursor:pointer;color:var(--muted);font-size:14px;line-height:1;padding:0 0 0 2px}
+.assignee-tag button:hover{color:var(--red)}
+
+/* MISC */
+.empty-state{text-align:center;padding:60px 20px;color:var(--muted)}
+.empty-state .empty-icon{font-size:40px;margin-bottom:12px}
+.section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
+.priority-high{color:var(--red)}
+.priority-medium{color:var(--amber)}
+.priority-low{color:var(--muted)}
+.task-row-done td{opacity:.5}
+
+/* CONNECTION BANNER */
+#conn-banner{display:none;position:fixed;top:0;left:0;right:0;z-index:300;text-align:center;font-size:13px;font-weight:600;padding:8px;color:white}
+#conn-banner.connecting{display:block;background:#d97706}
+#conn-banner.offline{display:block;background:#dc2626}
+.slack-form{max-width:640px}
+.slack-actions-row{display:flex;gap:10px;align-items:center;margin:14px 0;flex-wrap:wrap}
+.slack-note{font-size:12px;color:var(--muted);margin-top:4px}
+</style>
+</head>
+<body>
+
+<div id="conn-banner"></div>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <div class="login-box">
+    <div class="login-logo">
+      <div class="brand">Drake Content × BLUETTI</div>
+      <div class="sub">Project Management Portal</div>
+    </div>
+    <h2>Welcome back</h2>
+    <p>Enter your access password to continue</p>
+    <div class="form-group">
+      <label>Password</label>
+      <input type="password" id="login-password" placeholder="Enter password" onkeydown="if(event.key==='Enter')doLogin()">
+    </div>
+    <button class="btn-login" onclick="doLogin()">Sign in</button>
+    <div class="login-error" id="login-error">Incorrect password. Please try again.</div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <div class="layout">
+    <div class="sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-brand">Drake Content</div>
+        <div class="sidebar-client">× BLUETTI Australia</div>
+        <span class="sidebar-mode" id="sidebar-mode-badge"></span>
+      </div>
+      <div class="sidebar-nav" id="sidebar-nav"></div>
+      <div class="sidebar-footer">
+        <button class="btn-logout" onclick="doLogout()">Sign out</button>
+        <button class="btn-reset" id="btn-reset" style="display:none"></button>
+      </div>
+    </div>
+    <div class="main">
+      <div class="topbar">
+        <div class="topbar-title" id="topbar-title">Dashboard</div>
+        <div class="topbar-date" id="topbar-date"></div>
+      </div>
+      <div id="main-content"></div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL -->
+<div id="modal-overlay">
+  <div id="modal-box"><div id="modal-content"></div></div>
+</div>
+
+<script>
+// ============================================================
+// CONSTANTS
+// ============================================================
+const MONTHS = ['January 2026','February 2026','March 2026','April 2026','May 2026','June 2026'];
+const PROJECT_CATS = ['Testimonial','KOL/Influencer','PR','Paid Ads','Social Media','Event/Campaign','Other'];
+const TASK_CATS = ['Shoot Plan','KOC','KOL','PR','Social Media','Creative','General'];
+
+// Auth is handled server-side (POST /api/login). Roles: admin (full + values),
+// team (no dollar values), client (monthly delivery summary only).
+
+// ============================================================
+// DATA  (hydrated from the server via refreshState(); empty until then)
+// ============================================================
+let DATA = {
+  settings: { assignees: [] },
+  projects: [],
+  tasks: [],
+  monthlyGoals: [],
+  slack: null,
+};
+
+// ============================================================
+// AUTH & STATE
+// ============================================================
+let currentUser = null;   // 'admin' | 'team' | 'client'
+let activeSection = null;
+let activeTaskCat = 'Shoot Plan';
+let projectFilterMonth = 'All';
+let projectFilterCat = 'All';
+let goalsMonth = 'May 2026';
+let clientMonth = 'April 2026';
+let summaryMonth = 'March 2026';
+
+// ============================================================
+// API CLIENT + CONNECTION
+// ============================================================
+const TOKEN_KEY = 'dc_token', ROLE_KEY = 'dc_role';
+
+const API = {
+  token: localStorage.getItem(TOKEN_KEY) || null,
+  async req(method, path, body) {
+    const opts = { method, headers: {} };
+    if (body !== undefined) { opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body); }
+    if (API.token) opts.headers['Authorization'] = 'Bearer ' + API.token;
+    const r = await fetch('/api' + path, opts);
+    if (r.status === 401) { handleAuthExpired(); throw new Error('unauthorized'); }
+    if (!r.ok) { let e; try { e = (await r.json()).error; } catch(_) {} throw new Error(e || ('HTTP ' + r.status)); }
+    return r.status === 204 ? null : r.json();
+  },
+  async login(password) {
+    const r = await fetch('/api/login', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ password }) });
+    if (!r.ok) throw new Error('login-failed');
+    return r.json();
+  },
+  getState()           { return API.req('GET', '/state'); },
+  createProject(b)     { return API.req('POST', '/projects', b); },
+  updateProject(id, b) { return API.req('PATCH', '/projects/' + id, b); },
+  deleteProject(id)    { return API.req('DELETE', '/projects/' + id); },
+  createTask(b)        { return API.req('POST', '/tasks', b); },
+  updateTask(id, b)    { return API.req('PATCH', '/tasks/' + id, b); },
+  deleteTask(id)       { return API.req('DELETE', '/tasks/' + id); },
+  createGoal(b)        { return API.req('POST', '/goals', b); },
+  updateGoal(id, b)    { return API.req('PATCH', '/goals/' + id, b); },
+  deleteGoal(id)       { return API.req('DELETE', '/goals/' + id); },
+  setAssignees(list)   { return API.req('PATCH', '/settings/assignees', { assignees:list }); },
+  getSlack()           { return API.req('GET', '/settings/slack'); },
+  setSlack(b)          { return API.req('PATCH', '/settings/slack', b); },
+  slackChannels()      { return API.req('GET', '/slack/channels'); },
+  slackTest(channel)   { return API.req('POST', '/slack/test', { channel }); },
+  slackRun(kind)       { return API.req('POST', '/slack/run', { kind }); },
+  exportData()         { return API.req('GET', '/export'); },
+};
+
+function setConn(state) { // '', 'connecting', 'offline'
+  const b = document.getElementById('conn-banner');
+  b.className = state || '';
+  b.textContent = state === 'connecting' ? 'Connecting…' : state === 'offline' ? 'Offline — retrying…' : '';
+}
+
+function handleAuthExpired() {
+  API.token = null;
+  localStorage.removeItem(TOKEN_KEY); localStorage.removeItem(ROLE_KEY);
+  if (currentUser) { currentUser = null; doLogout(); }
+}
+
+// Pull the latest shared state from the server into DATA. Returns true on success.
+async function refreshState() {
+  try {
+    const s = await API.getState();
+    DATA.projects = s.projects || [];
+    DATA.tasks = s.tasks || [];
+    DATA.monthlyGoals = s.monthlyGoals || [];
+    DATA.settings = s.settings || { assignees: [] };
+    DATA.slack = s.slack;
+    setConn('');
+    return true;
+  } catch (e) {
+    if (e.message === 'unauthorized') return false;
+    setConn('offline');
+    return false;
+  }
+}
+
+// Run a mutation, then refresh + re-render. Shows offline banner on failure.
+async function mutate(fn, afterRender) {
+  try {
+    await fn();
+    await refreshState();
+    (afterRender || rerender)();
+    return true;
+  } catch (e) {
+    if (e.message === 'unauthorized') return false;
+    setConn('offline');
+    alert('Could not save — check your connection and try again.');
+    return false;
+  }
+}
+
+let pollTimer = null;
+function startPolling() {
+  stopPolling();
+  pollTimer = setInterval(async () => {
+    if (!currentUser) return;
+    const ok = await refreshState();
+    // Don't auto-refresh the Slack settings form — it would wipe unsaved edits.
+    if (ok && activeSection !== 'slack') rerender();
+  }, 30000);
+}
+function stopPolling() { if (pollTimer) clearInterval(pollTimer); pollTimer = null; }
+
+function rerender() {
+  if (document.getElementById('modal-overlay').classList.contains('open')) return;
+  ({ dashboard:renderDashboard, projects:renderProjects, tasks:renderTasks, goals:renderGoals,
+     summaries:renderSummaries, 'client-summary':renderClientSummary, slack:renderSlackSettings
+   }[activeSection] || function(){})();
+}
+
+// ============================================================
+// LOGIN / LOGOUT
+// ============================================================
+async function doLogin() {
+  const pwd = document.getElementById('login-password').value.trim();
+  const errEl = document.getElementById('login-error');
+  errEl.style.display = 'none';
+  if (!pwd) return;
+  setConn('connecting');
+  let res;
+  try {
+    res = await API.login(pwd);
+  } catch (e) {
+    setConn('');
+    errEl.textContent = 'Incorrect password. Please try again.';
+    errEl.style.display = 'block';
+    return;
+  }
+  API.token = res.token;
+  localStorage.setItem(TOKEN_KEY, res.token);
+  localStorage.setItem(ROLE_KEY, res.role);
+  await enterApp(res.role);
+}
+
+async function enterApp(role) {
+  currentUser = role;
+  setConn('connecting');
+  const ok = await refreshState();
+  if (!ok) {
+    // Token rejected or server unreachable.
+    if (!API.token) return; // handleAuthExpired already reset to login
+    setConn('offline');
+  }
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  initApp();
+  startPolling();
+}
+
+function doLogout() {
+  stopPolling();
+  currentUser = null;
+  API.token = null;
+  localStorage.removeItem(TOKEN_KEY); localStorage.removeItem(ROLE_KEY);
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('login-password').value = '';
+  setConn('');
+}
+
+// Resume an existing session on page load.
+window.addEventListener('DOMContentLoaded', () => {
+  const token = localStorage.getItem(TOKEN_KEY), role = localStorage.getItem(ROLE_KEY);
+  if (token && role) { API.token = token; enterApp(role); }
+});
+
+// ============================================================
+// INIT & NAV
+// ============================================================
+function initApp() {
+  const badge = document.getElementById('sidebar-mode-badge');
+  const labels = { admin:'Admin View', team:'Team View', client:'Bluetti Portal' };
+  const classes = { admin:'mode-admin', team:'mode-team', client:'mode-client' };
+  badge.textContent = labels[currentUser]; badge.className = 'sidebar-mode '+classes[currentUser];
+  document.getElementById('topbar-date').textContent = new Date().toLocaleDateString('en-AU',{weekday:'short',day:'numeric',month:'long',year:'numeric'});
+  document.getElementById('btn-reset').style.display = 'none';
+  buildNav();
+  showSection(currentUser==='client' ? 'client-summary' : 'dashboard');
+}
+
+function buildNav() {
+  const nav = document.getElementById('sidebar-nav');
+  if (currentUser==='client') {
+    nav.innerHTML = `<div class="nav-section">Client Portal</div>
+      <div class="nav-item" data-sec="client-summary" onclick="showSection('client-summary')"><span class="nav-icon">📋</span>Monthly Summary</div>`;
+    return;
+  }
+  // admin + team share most nav; admin gets Monthly Summaries
+  let html = `<div class="nav-section">Overview</div>
+    <div class="nav-item" data-sec="dashboard" onclick="showSection('dashboard')"><span class="nav-icon">📊</span>Dashboard</div>
+    <div class="nav-section">Work</div>
+    <div class="nav-item" data-sec="projects" onclick="showSection('projects')"><span class="nav-icon">📁</span>Projects</div>
+    <div class="nav-item" data-sec="tasks" onclick="showSection('tasks')"><span class="nav-icon">✅</span>Tasks</div>
+    <div class="nav-section">Planning</div>
+    <div class="nav-item" data-sec="goals" onclick="showSection('goals')"><span class="nav-icon">🎯</span>Monthly Goals</div>`;
+  if (currentUser==='admin') {
+    html += `<div class="nav-item" data-sec="summaries" onclick="showSection('summaries')"><span class="nav-icon">💰</span>Monthly Summaries</div>
+      <div class="nav-section">Settings</div>
+      <div class="nav-item" data-sec="slack" onclick="showSection('slack')"><span class="nav-icon">💬</span>Slack & Automation</div>`;
+  }
+  nav.innerHTML = html;
+}
+
+function showSection(sec) {
+  activeSection = sec;
+  document.querySelectorAll('.nav-item').forEach(el => el.classList.toggle('active', el.dataset.sec===sec));
+  const titles = { dashboard:'Dashboard', projects:'Projects', tasks:'Tasks', goals:'Monthly Goals', summaries:'Monthly Summaries', 'client-summary':'Monthly Delivery Summary', slack:'Slack & Automation' };
+  document.getElementById('topbar-title').textContent = titles[sec]||sec;
+  ({ dashboard:renderDashboard, projects:renderProjects, tasks:renderTasks, goals:renderGoals, summaries:renderSummaries, 'client-summary':renderClientSummary, slack:renderSlackSettings }[sec]||function(){})();
+}
+
+// ============================================================
+// UTILITIES
+// ============================================================
+function openModal(html) { document.getElementById('modal-content').innerHTML=html; document.getElementById('modal-overlay').classList.add('open'); }
+function closeModal() { document.getElementById('modal-overlay').classList.remove('open'); }
+document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeModal(); });
+
+function statusBadge(s) {
+  const m = { 'Completed':'badge-green','Done':'badge-green','In Production':'badge-blue','In Progress':'badge-blue','Planning':'badge-amber','To Do':'badge-amber','Pending':'badge-amber','Pending Decision':'badge-amber','On Hold':'badge-gray','Void':'badge-gray','Pass':'badge-gray','Published':'badge-green','Posted':'badge-green','Approved':'badge-teal','Scheduled':'badge-teal','Confirmed':'badge-teal','Partnered':'badge-purple' };
+  return `<span class="badge ${m[s]||'badge-gray'}">${s}</span>`;
+}
+function catBadge(c) {
+  const m = { 'Testimonial':'badge-blue','KOL/Influencer':'badge-purple','PR':'badge-teal','Paid Ads':'badge-orange','Social Media':'badge-green','Event/Campaign':'badge-amber','Other':'badge-gray' };
+  return `<span class="badge ${m[c]||'badge-gray'}">${c}</span>`;
+}
+function taskCatColor(c) {
+  return { 'Shoot Plan':'#2563eb','KOC':'#16a34a','KOL':'#7c3aed','PR':'#0891b2','Social Media':'#ea580c','Creative':'#d97706','General':'#64748b' }[c]||'#64748b';
+}
+function fmtAUD(n) { return 'AUD $'+Number(n).toLocaleString('en-AU',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function isOverdue(d,s) { if(!d||s==='Done'||s==='Completed'||s==='Void') return false; return new Date(d)<new Date(new Date().toDateString()); }
+function driveLinkHTML(url, label) {
+  if (!url) return '';
+  return `<a href="${url}" target="_blank" class="drive-link" onclick="event.stopPropagation()">📁 ${label||'View Files'}</a>`;
+}
+function getAssignees() { return DATA.settings.assignees || ['Andy','Luke','Martin','Maverick']; }
+
+// ============================================================
+// DASHBOARD
+// ============================================================
+function renderDashboard() {
+  const todo=DATA.tasks.filter(t=>t.status==='To Do').length;
+  const inProg=DATA.tasks.filter(t=>t.status==='In Progress').length;
+  const done=DATA.tasks.filter(t=>t.status==='Done').length;
+  const overdue=DATA.tasks.filter(t=>isOverdue(t.dueDate,t.status)).length;
+  const activeProjects=DATA.projects.filter(p=>p.status!=='Completed').length;
+  const today=new Date(); const weekEnd=new Date(today); weekEnd.setDate(today.getDate()+7);
+  const dueThisWeek=DATA.tasks.filter(t=>{ if(!t.dueDate||t.status==='Done') return false; const d=new Date(t.dueDate); return d>=today&&d<=weekEnd; });
+  const currentGoals=DATA.monthlyGoals.find(g=>g.month==='May 2026')||DATA.monthlyGoals[0];
+
+  let html = `<div class="stat-grid">
+    <div class="stat-card"><div class="stat-label">Active Projects</div><div class="stat-value" style="color:var(--blue)">${activeProjects}</div><div class="stat-sub">in production / planning</div></div>
+    <div class="stat-card"><div class="stat-label">In Progress</div><div class="stat-value" style="color:var(--amber)">${inProg}</div><div class="stat-sub">${todo} to do</div></div>
+    <div class="stat-card"><div class="stat-label">Overdue</div><div class="stat-value" style="color:${overdue>0?'var(--red)':'var(--green)'}">${overdue}</div><div class="stat-sub">${overdue>0?'needs attention':'all on track'}</div></div>
+    <div class="stat-card"><div class="stat-label">Tasks Done</div><div class="stat-value" style="color:var(--green)">${done}</div><div class="stat-sub">marked complete</div></div>
+  </div>`;
+
+  if (dueThisWeek.length) {
+    html+=`<div class="card"><div class="card-header"><div class="card-title">⚡ Due This Week</div></div><div class="table-wrap"><table><thead><tr><th>Task</th><th>Category</th><th>Assignee</th><th>Due</th><th>Status</th></tr></thead><tbody>`;
+    dueThisWeek.forEach(t=>{ const od=isOverdue(t.dueDate,t.status); html+=`<tr class="${t.status==='Done'?'task-row-done':''}"><td style="font-weight:600;${od?'color:var(--red)':''}">${t.task}${od?' ⚠':''}</td><td><span style="color:${taskCatColor(t.category)};font-weight:600;font-size:12px">${t.category}</span></td><td>${t.assignee}</td><td style="${od?'color:var(--red);font-weight:700':''};font-size:12px">${t.dueDate}</td><td>${statusBadge(t.status)}</td></tr>`; });
+    html+=`</tbody></table></div></div>`;
+  }
+
+  if (currentGoals) {
+    html+=`<div class="card"><div class="card-header"><div class="card-title">🎯 ${currentGoals.month} Goals</div><button class="btn btn-sm btn-ghost" onclick="showSection('goals')">View all →</button></div><div class="card-body">`;
+    currentGoals.goals.forEach(g=>{ html+=`<div class="goal-item"><div class="goal-cat-dot" style="background:${taskCatColor(g.category)}"></div><div class="goal-desc">${g.description}</div><div class="goal-target">${g.target}</div></div>`; });
+    html+=`</div></div>`;
+  }
+
+  const active=DATA.projects.filter(p=>p.status!=='Completed');
+  if (active.length) {
+    html+=`<div class="card"><div class="card-header"><div class="card-title">📁 Active Projects</div><button class="btn btn-sm btn-ghost" onclick="showSection('projects')">View all →</button></div><div class="table-wrap"><table><thead><tr><th>Project</th><th>Category</th><th>Month</th>${currentUser==='admin'?'<th>Value</th>':''}<th>Status</th></tr></thead><tbody>`;
+    active.forEach(p=>{ html+=`<tr style="cursor:pointer" onclick="showSection('projects')"><td style="font-weight:600">${p.name}</td><td>${catBadge(p.category)}</td><td style="color:var(--muted)">${p.month}</td>${currentUser==='admin'?`<td style="font-weight:700;color:var(--green)">${fmtAUD(p.value)}</td>`:''}<td>${statusBadge(p.status)}</td></tr>`; });
+    html+=`</tbody></table></div></div>`;
+  }
+  document.getElementById('main-content').innerHTML=html;
+}
+
+// ============================================================
+// PROJECTS
+// ============================================================
+function renderProjects(fMonth, fCat) {
+  if (fMonth!==undefined) projectFilterMonth=fMonth;
+  if (fCat!==undefined) projectFilterCat=fCat;
+  const showValue = currentUser==='admin';
+
+  const projects=DATA.projects.filter(p=>(projectFilterMonth==='All'||p.month===projectFilterMonth)&&(projectFilterCat==='All'||p.category===projectFilterCat));
+
+  let html=`<div class="filter-bar">
+    <select class="filter-select" onchange="renderProjects(this.value,'${projectFilterCat}')">
+      <option value="All" ${projectFilterMonth==='All'?'selected':''}>All Months</option>
+      ${MONTHS.map(m=>`<option value="${m}" ${m===projectFilterMonth?'selected':''}>${m}</option>`).join('')}
+    </select>
+    <select class="filter-select" onchange="renderProjects('${projectFilterMonth}',this.value)">
+      <option value="All" ${projectFilterCat==='All'?'selected':''}>All Categories</option>
+      ${PROJECT_CATS.map(c=>`<option value="${c}" ${c===projectFilterCat?'selected':''}>${c}</option>`).join('')}
+    </select>
+    <button class="btn btn-primary" onclick="addProjectModal()" style="margin-left:auto">+ New Project</button>
+  </div>`;
+
+  if (!projects.length) { html+=`<div class="empty-state"><div class="empty-icon">📁</div><p>No projects match this filter.</p></div>`; document.getElementById('main-content').innerHTML=html; return; }
+
+  projects.forEach(p=>{
+    const taskCount=DATA.tasks.filter(t=>t.projectId===p.id).length;
+    html+=`<div class="project-card">
+      <div class="project-card-header">
+        <div style="flex:1;min-width:0">
+          <div class="project-card-title">${p.name}</div>
+          <div class="project-card-meta" style="margin-top:6px">
+            ${catBadge(p.category)} ${statusBadge(p.status)}
+            <span style="font-size:12px;color:var(--muted)">${p.month}</span>
+            ${p.subject?`<span style="font-size:12px;color:var(--muted)">· ${p.subject}</span>`:''}
+            ${p.product?`<span class="badge badge-gray">${p.product}</span>`:''}
+            ${taskCount?`<span style="font-size:12px;color:var(--muted)">· ${taskCount} task${taskCount>1?'s':''}</span>`:''}
+            ${p.driveLink?`<a href="${p.driveLink}" target="_blank" class="drive-link">📁 Project Files</a>`:''}
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;flex-shrink:0">
+          ${showValue?`<div style="font-size:15px;font-weight:800;color:var(--green)">${fmtAUD(p.value)}</div>`:''}
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-sm btn-outline" onclick="addDeliverableModal(${p.id})">+ Deliverable</button>
+            <button class="btn btn-sm btn-ghost" onclick="editProjectModal(${p.id})">✎</button>
+            <button class="btn btn-sm btn-ghost" onclick="deleteProject(${p.id})" style="color:var(--red)">✕</button>
+          </div>
+        </div>
+      </div>`;
+
+    if (p.deliverables&&p.deliverables.length) {
+      html+=`<div class="deliverable-list">`;
+      p.deliverables.forEach((d,idx)=>{
+        html+=`<div class="deliverable-item">
+          <div class="deliverable-dot"></div>
+          <div class="deliverable-text">${d.text}${d.driveLink?` <a href="${d.driveLink}" target="_blank" class="drive-link" style="margin-left:6px">📁 Files</a>`:''}</div>
+          <div class="deliverable-actions">
+            <button class="btn btn-sm btn-ghost" onclick="editDeliverableModal(${p.id},${idx})">✎</button>
+            <button class="btn btn-sm btn-ghost" onclick="deleteDeliverable(${p.id},${idx})" style="color:var(--red)">✕</button>
+          </div>
+        </div>`;
+      });
+      html+=`</div>`;
+    } else {
+      html+=`<div style="padding:12px 18px 14px;color:var(--muted);font-size:13px;font-style:italic">No deliverables yet — click "+ Deliverable" to add.</div>`;
+    }
+    if (p.note) html+=`<div style="padding:8px 18px 12px;background:var(--amber-light);font-size:12px;color:#92400e">📝 ${p.note}</div>`;
+    html+=`</div>`;
+  });
+
+  if (showValue&&projects.length>1) {
+    const total=projects.reduce((s,p)=>s+Number(p.value||0),0);
+    html+=`<div style="text-align:right;padding:8px 4px;font-size:14px;font-weight:700;color:var(--green)">Total: ${fmtAUD(total)}</div>`;
+  }
+  document.getElementById('main-content').innerHTML=html;
+}
+
+function projectFormHTML(p) {
+  const showValue = currentUser==='admin';
+  return `
+    <div class="modal-field"><label>Project Name</label><input type="text" id="pj-name" value="${(p&&p.name||'').replace(/"/g,'&quot;')}" placeholder="e.g. Terrence Alfred — EP2000 Testimonial"></div>
+    <div class="modal-field"><label>Subject / Person</label><input type="text" id="pj-subject" value="${(p&&p.subject||'').replace(/"/g,'&quot;')}" placeholder="e.g. Terrence Alfred"></div>
+    <div class="field-row">
+      <div class="modal-field"><label>Product</label><input type="text" id="pj-product" value="${(p&&p.product||'').replace(/"/g,'&quot;')}" placeholder="e.g. EP2000"></div>
+      <div class="modal-field"><label>Month</label><select id="pj-month">${MONTHS.map(m=>`<option value="${m}" ${p&&p.month===m?'selected':''}>${m}</option>`).join('')}</select></div>
+    </div>
+    <div class="field-row">
+      <div class="modal-field"><label>Category</label><select id="pj-cat">${PROJECT_CATS.map(c=>`<option value="${c}" ${p&&p.category===c?'selected':''}>${c}</option>`).join('')}</select></div>
+      <div class="modal-field"><label>Status</label><select id="pj-status">${['Planning','In Production','Completed','On Hold'].map(s=>`<option value="${s}" ${p&&p.status===s?'selected':''}>${s}</option>`).join('')}</select></div>
+    </div>
+    ${showValue?`<div class="modal-field"><label>Value (AUD)</label><input type="number" id="pj-value" value="${p&&p.value||''}" placeholder="e.g. 6000" step="0.01" min="0"></div>`:''}
+    <div class="modal-field"><label>Project Drive Folder Link <span style="font-weight:400;color:var(--muted)">(optional)</span></label><input type="url" id="pj-drive" value="${p&&p.driveLink||''}" placeholder="https://drive.google.com/..."></div>
+    <div class="modal-field"><label>Internal Note</label><textarea id="pj-note" rows="2">${p&&p.note||''}</textarea></div>
+    <div class="modal-field"><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="pj-show" ${!p||p.showClient?'checked':''}> Show on client dashboard</label></div>`;
+}
+function addProjectModal() { openModal(`<div class="modal-title">New Project</div>${projectFormHTML(null)}<div class="modal-actions"><button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveNewProject()">Create Project</button></div>`); }
+function saveNewProject() {
+  const name=document.getElementById('pj-name').value.trim(); if(!name) return;
+  const valEl=document.getElementById('pj-value');
+  const body={ name, subject:document.getElementById('pj-subject').value, product:document.getElementById('pj-product').value, category:document.getElementById('pj-cat').value, month:document.getElementById('pj-month').value, status:document.getElementById('pj-status').value, driveLink:document.getElementById('pj-drive').value, deliverables:[], note:document.getElementById('pj-note').value, showClient:document.getElementById('pj-show').checked };
+  if(valEl) body.value=parseFloat(valEl.value)||0;
+  mutate(()=>API.createProject(body), ()=>{ closeModal(); renderProjects(); });
+}
+function editProjectModal(id) { const p=DATA.projects.find(x=>x.id===id); openModal(`<div class="modal-title">Edit Project</div>${projectFormHTML(p)}<div class="modal-actions"><button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveProjectEdit(${id})">Save</button></div>`); }
+function saveProjectEdit(id) {
+  const body={ name:document.getElementById('pj-name').value, subject:document.getElementById('pj-subject').value, product:document.getElementById('pj-product').value, category:document.getElementById('pj-cat').value, month:document.getElementById('pj-month').value, status:document.getElementById('pj-status').value, driveLink:document.getElementById('pj-drive').value, note:document.getElementById('pj-note').value, showClient:document.getElementById('pj-show').checked };
+  const valEl=document.getElementById('pj-value'); if(valEl) body.value=parseFloat(valEl.value)||0;
+  mutate(()=>API.updateProject(id, body), ()=>{ closeModal(); renderProjects(); });
+}
+function deleteProject(id) { if(!confirm('Delete this project?')) return; mutate(()=>API.deleteProject(id), renderProjects); }
+
+function addDeliverableModal(pid) {
+  const p=DATA.projects.find(x=>x.id===pid);
+  const doneTasks=DATA.tasks.filter(t=>t.projectId===pid&&t.status==='Done');
+  const suggest=doneTasks.length?`<div class="modal-field"><label>Or pull from a completed task</label><select id="dv-sel"><option value="">— select —</option>${doneTasks.map(t=>`<option value="${t.task}">${t.task}</option>`).join('')}</select><button type="button" class="btn btn-sm btn-outline" style="margin-top:6px" onclick="document.getElementById('dv-text').value=document.getElementById('dv-sel').value">Use this task</button></div>`:'';
+  openModal(`<div class="modal-title">Add Deliverable — ${p.name}</div>
+    <div class="modal-field"><label>Deliverable Description</label><textarea id="dv-text" rows="3" placeholder="Describe what was delivered..."></textarea></div>
+    <div class="modal-field"><label>Drive Link <span style="font-weight:400;color:var(--muted)">(optional — folder or file)</span></label><input type="url" id="dv-drive" placeholder="https://drive.google.com/..."></div>
+    ${suggest}
+    <div class="modal-actions"><button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveNewDeliverable(${pid})">Add</button></div>`);
+}
+function saveNewDeliverable(pid) {
+  const text=document.getElementById('dv-text').value.trim(); if(!text) return;
+  const p=DATA.projects.find(x=>x.id===pid);
+  const dels=[...(p.deliverables||[]), {text, driveLink:document.getElementById('dv-drive').value}];
+  mutate(()=>API.updateProject(pid,{deliverables:dels}), ()=>{ closeModal(); renderProjects(); });
+}
+function editDeliverableModal(pid,idx) {
+  const p=DATA.projects.find(x=>x.id===pid); const d=p.deliverables[idx];
+  openModal(`<div class="modal-title">Edit Deliverable</div>
+    <div class="modal-field"><label>Description</label><textarea id="dv-edit" rows="3">${d.text.replace(/</g,'&lt;')}</textarea></div>
+    <div class="modal-field"><label>Drive Link</label><input type="url" id="dv-dedit" value="${d.driveLink||''}" placeholder="https://drive.google.com/..."></div>
+    <div class="modal-actions"><button class="btn btn-ghost" style="color:var(--red);margin-right:auto" onclick="deleteDeliverableM(${pid},${idx})">Delete</button><button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveDeliverableEdit(${pid},${idx})">Save</button></div>`);
+}
+function saveDeliverableEdit(pid,idx) {
+  const p=DATA.projects.find(x=>x.id===pid); const t=document.getElementById('dv-edit').value.trim(); if(!t) return;
+  const dels=p.deliverables.map((d,i)=> i===idx ? {text:t, driveLink:document.getElementById('dv-dedit').value} : d);
+  mutate(()=>API.updateProject(pid,{deliverables:dels}), ()=>{ closeModal(); renderProjects(); });
+}
+function deleteDeliverable(pid,idx) {
+  if(!confirm('Remove this deliverable?')) return;
+  const p=DATA.projects.find(x=>x.id===pid); const dels=p.deliverables.filter((_,i)=>i!==idx);
+  mutate(()=>API.updateProject(pid,{deliverables:dels}), renderProjects);
+}
+function deleteDeliverableM(pid,idx) {
+  const p=DATA.projects.find(x=>x.id===pid); const dels=p.deliverables.filter((_,i)=>i!==idx);
+  mutate(()=>API.updateProject(pid,{deliverables:dels}), ()=>{ closeModal(); renderProjects(); });
+}
+
+// ============================================================
+// TASKS
+// ============================================================
+function renderTasks(cat) {
+  if (cat) activeTaskCat=cat;
+  const tasks=DATA.tasks.filter(t=>t.category===activeTaskCat);
+  const sorted=[...tasks].sort((a,b)=>{ const ao=isOverdue(a.dueDate,a.status)?0:1,bo=isOverdue(b.dueDate,b.status)?0:1; return ao!==bo?ao-bo:(a.dueDate||'').localeCompare(b.dueDate||''); });
+
+  let html=`<div class="tabs">${TASK_CATS.map(c=>`<div class="tab ${c===activeTaskCat?'active':''}" onclick="renderTasks('${c}')">${c}</div>`).join('')}</div>
+    <div class="section-header">
+      <div style="display:flex;align-items:center;gap:12px">
+        <span style="font-size:13px;color:var(--muted)">${tasks.length} task${tasks.length!==1?'s':''} · ${activeTaskCat}</span>
+        <button class="btn btn-sm btn-ghost" onclick="manageAssigneesModal()" style="font-size:11px">⚙ Manage Assignees</button>
+      </div>
+      <button class="btn btn-primary" onclick="addTaskModal('${activeTaskCat}')">+ New Task</button>
+    </div>`;
+
+  if (!tasks.length) { html+=`<div class="empty-state"><div class="empty-icon">✅</div><p>No ${activeTaskCat} tasks yet.</p></div>`; document.getElementById('main-content').innerHTML=html; return; }
+
+  html+=`<div class="card"><div class="table-wrap"><table><thead><tr><th>Task</th><th>Linked Project</th><th>Assignee</th><th>Due</th><th>Priority</th><th>Status</th><th></th></tr></thead><tbody>`;
+  sorted.forEach(t=>{
+    const od=isOverdue(t.dueDate,t.status);
+    const proj=t.projectId?DATA.projects.find(p=>p.id===t.projectId):null;
+    html+=`<tr class="${t.status==='Done'?'task-row-done':''}">
+      <td><div style="font-weight:600;${od?'color:var(--red)':''}">${t.task}${od?' ⚠':''}</div>
+        ${t.driveLink?`<div style="margin-top:4px"><a href="${t.driveLink}" target="_blank" class="drive-link">📁 Files</a></div>`:''}
+        ${t.note?`<div style="font-size:11px;color:var(--muted);margin-top:2px">${t.note.substring(0,80)}${t.note.length>80?'…':''}</div>`:''}</td>
+      <td style="font-size:12px;color:var(--blue)">${proj?proj.name:'<span style="color:var(--muted)">—</span>'}</td>
+      <td style="font-weight:500">${t.assignee}</td>
+      <td style="${od?'color:var(--red);font-weight:700':''};font-size:12px">${t.dueDate||'—'}</td>
+      <td><span class="priority-${(t.priority||'').toLowerCase()}" style="font-size:12px;font-weight:700">● ${t.priority}</span></td>
+      <td>${statusBadge(t.status)}</td>
+      <td style="white-space:nowrap">
+        ${t.status!=='Done'?`<button class="btn btn-sm btn-ghost" onclick="quickDone(${t.id})" title="Mark done" style="color:var(--green)">✓</button>`:''}
+        <button class="btn btn-sm btn-ghost" onclick="editTaskModal(${t.id})">✎</button>
+        <button class="btn btn-sm btn-ghost" onclick="deleteTask(${t.id})" style="color:var(--red)">✕</button>
+      </td>
+    </tr>`;
+  });
+  html+=`</tbody></table></div></div>`;
+  document.getElementById('main-content').innerHTML=html;
+}
+
+function taskFormHTML(t, defaultCat) {
+  const cat=t?t.category:(defaultCat||'General');
+  const assignees=getAssignees();
+  return `
+    <div class="modal-field"><label>Task</label><input type="text" id="tk-task" value="${(t&&t.task||'').replace(/"/g,'&quot;')}" placeholder="Describe the task..."></div>
+    <div class="field-row">
+      <div class="modal-field"><label>Category</label><select id="tk-cat">${TASK_CATS.map(c=>`<option value="${c}" ${c===cat?'selected':''}>${c}</option>`).join('')}</select></div>
+      <div class="modal-field"><label>Assignee</label><select id="tk-assign">${assignees.map(a=>`<option value="${a}" ${t&&t.assignee===a?'selected':''}>${a}</option>`).join('')}</select></div>
+    </div>
+    <div class="field-row">
+      <div class="modal-field"><label>Due Date</label><input type="date" id="tk-due" value="${t&&t.dueDate||''}"></div>
+      <div class="modal-field"><label>Priority</label><select id="tk-prio"><option value="High" ${!t||t.priority==='High'?'selected':''}>High</option><option value="Medium" ${t&&t.priority==='Medium'?'selected':''}>Medium</option><option value="Low" ${t&&t.priority==='Low'?'selected':''}>Low</option></select></div>
+    </div>
+    <div class="modal-field"><label>Status</label><select id="tk-status">${['To Do','In Progress','Done','On Hold','Void'].map(s=>`<option value="${s}" ${t&&t.status===s?'selected':''}>${s}</option>`).join('')}</select></div>
+    <div class="modal-field"><label>Linked Project <span style="font-weight:400;color:var(--muted)">(optional)</span></label><select id="tk-proj"><option value="">— none —</option>${DATA.projects.map(p=>`<option value="${p.id}" ${t&&t.projectId===p.id?'selected':''}>${p.name} (${p.month})</option>`).join('')}</select></div>
+    <div class="modal-field"><label>Google Drive Link <span style="font-weight:400;color:var(--muted)">(optional — assets folder or reference)</span></label><input type="url" id="tk-drive" value="${t&&t.driveLink||''}" placeholder="https://drive.google.com/..."></div>
+    <div class="modal-field"><label>${cat==='Shoot Plan'?'Shoot Brief / Notes':'Note'}</label><textarea id="tk-note" rows="${cat==='Shoot Plan'?5:3}" placeholder="${cat==='Shoot Plan'?'Location, crew, subject, brief, requirements...':'Any context or notes...'}">${t&&t.note||''}</textarea></div>`;
+}
+
+function addTaskModal(cat) { openModal(`<div class="modal-title">New Task — ${cat}</div>${taskFormHTML(null,cat)}<div class="modal-actions"><button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveNewTask()">Create Task</button></div>`); }
+function saveNewTask() {
+  const task=document.getElementById('tk-task').value.trim(); if(!task) return;
+  const pv=document.getElementById('tk-proj').value;
+  const newCat=document.getElementById('tk-cat').value;
+  const body={ category:newCat, task, assignee:document.getElementById('tk-assign').value, dueDate:document.getElementById('tk-due').value, priority:document.getElementById('tk-prio').value, status:document.getElementById('tk-status').value, projectId:pv?parseInt(pv):null, driveLink:document.getElementById('tk-drive').value, note:document.getElementById('tk-note').value };
+  mutate(()=>API.createTask(body), ()=>{ closeModal(); renderTasks(newCat); });
+}
+function editTaskModal(id) {
+  const t=DATA.tasks.find(x=>x.id===id);
+  openModal(`<div class="modal-title">Edit Task</div>${taskFormHTML(t)}<div class="modal-actions">${t.status!=='Done'&&t.projectId?`<button class="btn btn-ghost" style="color:var(--green);margin-right:auto" onclick="promoteTask(${id})">→ Add to project</button>`:'<div style="flex:1"></div>'}<button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveTaskEdit(${id})">Save</button></div>`);
+}
+function saveTaskEdit(id) {
+  const pv=document.getElementById('tk-proj').value;
+  const body={ task:document.getElementById('tk-task').value, category:document.getElementById('tk-cat').value, assignee:document.getElementById('tk-assign').value, dueDate:document.getElementById('tk-due').value, priority:document.getElementById('tk-prio').value, status:document.getElementById('tk-status').value, driveLink:document.getElementById('tk-drive').value, projectId:pv?parseInt(pv):null, note:document.getElementById('tk-note').value };
+  mutate(()=>API.updateTask(id, body), ()=>{ closeModal(); renderTasks(); });
+}
+function deleteTask(id) { if(!confirm('Delete this task?')) return; mutate(()=>API.deleteTask(id), renderTasks); }
+function quickDone(id) { mutate(()=>API.updateTask(id,{status:'Done'}), renderTasks); }
+function promoteTask(id) {
+  const t=DATA.tasks.find(x=>x.id===id); if(!t||!t.projectId) return;
+  const p=DATA.projects.find(x=>x.id===t.projectId); if(!p) return;
+  const dels=[...(p.deliverables||[]), {text:t.task, driveLink:t.driveLink||''}];
+  mutate(async()=>{ await API.updateProject(p.id,{deliverables:dels}); await API.updateTask(id,{status:'Done'}); },
+    ()=>{ closeModal(); alert(`Added to "${p.name}" deliverables.`); renderTasks(); });
+}
+
+// ── Manage Assignees ──────────────────────────────────────
+function manageAssigneesModal() {
+  renderAssigneeModal();
+}
+function renderAssigneeModal() {
+  const assignees=getAssignees();
+  const tags=assignees.map((a,i)=>`<span class="assignee-tag">${a}<button onclick="deleteAssignee(${i})">×</button></span>`).join('');
+  openModal(`<div class="modal-title">⚙ Manage Assignees</div>
+    <div class="modal-field"><label>Current Assignees</label><div style="margin-top:6px">${tags||'<span style="color:var(--muted);font-size:13px">None yet</span>'}</div></div>
+    <div class="modal-field"><label>Add New Assignee</label><div style="display:flex;gap:8px"><input type="text" id="new-assignee" placeholder="Name" style="border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;outline:none;flex:1"><button class="btn btn-primary" onclick="addAssignee()">Add</button></div></div>
+    <div class="modal-actions"><button class="btn btn-outline" onclick="closeModal()">Done</button></div>`);
+}
+function addAssignee() {
+  const val=document.getElementById('new-assignee').value.trim(); if(!val) return;
+  const list=[...getAssignees()];
+  if (list.includes(val)) { renderAssigneeModal(); return; }
+  list.push(val);
+  mutate(()=>API.setAssignees(list), renderAssigneeModal);
+}
+function deleteAssignee(idx) {
+  if(!confirm('Remove this assignee?')) return;
+  const list=getAssignees().filter((_,i)=>i!==idx);
+  mutate(()=>API.setAssignees(list), renderAssigneeModal);
+}
+
+// ============================================================
+// MONTHLY GOALS
+// ============================================================
+function renderGoals(mon) {
+  if (mon) goalsMonth=mon;
+  const entry=DATA.monthlyGoals.find(g=>g.month===goalsMonth)||{month:goalsMonth,goals:[]};
+
+  let html=`<div class="filter-bar"><select class="filter-select" onchange="renderGoals(this.value)">${MONTHS.map(m=>`<option value="${m}" ${m===goalsMonth?'selected':''}>${m}</option>`).join('')}</select><button class="btn btn-primary" onclick="addGoalModal('${goalsMonth}')" style="margin-left:auto">+ Add Goal</button></div>`;
+
+  if (!entry.goals.length) { html+=`<div class="empty-state"><div class="empty-icon">🎯</div><p>No goals set for ${goalsMonth} yet.</p></div>`; document.getElementById('main-content').innerHTML=html; return; }
+
+  html+=`<div class="card"><div class="card-header"><div class="card-title">🎯 ${goalsMonth} — Monthly Goals</div></div><div class="card-body">`;
+  entry.goals.forEach(g=>{ html+=`<div class="goal-item"><div class="goal-cat-dot" style="background:${taskCatColor(g.category)}"></div><div><div class="goal-desc">${g.description}</div><span style="font-size:11px;color:${taskCatColor(g.category)};font-weight:600">${g.category}</span></div><div class="goal-target">${g.target}</div><div style="display:flex;gap:4px;flex-shrink:0"><button class="btn btn-sm btn-ghost" onclick="editGoalModal('${goalsMonth}',${g.id})">✎</button><button class="btn btn-sm btn-ghost" onclick="deleteGoal('${goalsMonth}',${g.id})" style="color:var(--red)">✕</button></div></div>`; });
+  html+=`</div></div>`;
+  document.getElementById('main-content').innerHTML=html;
+}
+
+function goalFormHTML(g) {
+  const cats=['Testimonial','KOL','KOC','PR','Social Media','Paid Ads','Shoot','Creative','General'];
+  return `<div class="modal-field"><label>Goal Description</label><input type="text" id="gl-desc" value="${(g&&g.description||'').replace(/"/g,'&quot;')}" placeholder="e.g. Complete 3 testimonial edits"></div>
+    <div class="field-row"><div class="modal-field"><label>Category</label><select id="gl-cat">${cats.map(c=>`<option value="${c}" ${g&&g.category===c?'selected':''}>${c}</option>`).join('')}</select></div><div class="modal-field"><label>Target</label><input type="text" id="gl-target" value="${(g&&g.target||'').replace(/"/g,'&quot;')}" placeholder="e.g. 3 edits"></div></div>`;
+}
+function addGoalModal(month) { openModal(`<div class="modal-title">Add Goal — ${month}</div>${goalFormHTML(null)}<div class="modal-actions"><button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveNewGoal('${month}')">Add Goal</button></div>`); }
+function saveNewGoal(month) {
+  const desc=document.getElementById('gl-desc').value.trim(); if(!desc) return;
+  const body={ month, category:document.getElementById('gl-cat').value, description:desc, target:document.getElementById('gl-target').value };
+  mutate(()=>API.createGoal(body), ()=>{ closeModal(); renderGoals(month); });
+}
+function editGoalModal(month,id) { const entry=DATA.monthlyGoals.find(g=>g.month===month); const g=entry&&entry.goals.find(x=>x.id===id); openModal(`<div class="modal-title">Edit Goal</div>${goalFormHTML(g)}<div class="modal-actions"><button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveGoalEdit('${month}',${id})">Save</button></div>`); }
+function saveGoalEdit(month,id) {
+  const body={ description:document.getElementById('gl-desc').value, category:document.getElementById('gl-cat').value, target:document.getElementById('gl-target').value };
+  mutate(()=>API.updateGoal(id, body), ()=>{ closeModal(); renderGoals(month); });
+}
+function deleteGoal(month,id) { mutate(()=>API.deleteGoal(id), ()=>renderGoals(month)); }
+
+// ============================================================
+// MONTHLY SUMMARIES (admin only)
+// ============================================================
+function renderSummaries(mon) {
+  if (mon) summaryMonth=mon;
+
+  const months=[...new Set(DATA.projects.map(p=>p.month))].sort((a,b)=>MONTHS.indexOf(a)-MONTHS.indexOf(b));
+
+  let html=`<div class="filter-bar">
+    <select class="filter-select" onchange="renderSummaries(this.value)">
+      ${months.map(m=>`<option value="${m}" ${m===summaryMonth?'selected':''}>${m} Summary</option>`).join('')}
+    </select>
+  </div>`;
+
+  const mp=DATA.projects.filter(p=>p.month===summaryMonth);
+  if (!mp.length) { html+=`<div class="empty-state"><div class="empty-icon">💰</div><p>No projects recorded for ${summaryMonth} yet.</p></div>`; document.getElementById('main-content').innerHTML=html; return; }
+
+  const total=mp.reduce((s,p)=>s+Number(p.value||0),0);
+
+  html+=`<div style="margin-bottom:20px">
+    <div style="font-size:22px;font-weight:800;margin-bottom:4px">${summaryMonth} Summary</div>
+    <div style="font-size:13px;color:var(--muted)">${mp.length} project${mp.length!==1?'s':''} · Total ${fmtAUD(total)}</div>
+  </div>`;
+
+  mp.forEach(p=>{
+    html+=`<div class="card" style="margin-bottom:14px">
+      <div class="card-header">
+        <div><div style="font-weight:700;font-size:15px">${p.name}</div><div style="margin-top:4px;display:flex;gap:8px">${catBadge(p.category)} ${statusBadge(p.status)}</div></div>
+        <div style="font-size:18px;font-weight:800;color:var(--green)">${fmtAUD(p.value)}</div>
+      </div>`;
+    if (p.deliverables&&p.deliverables.length) {
+      html+=`<div style="padding:4px 20px 12px">`;
+      p.deliverables.forEach(d=>{ html+=`<div style="display:flex;align-items:flex-start;gap:8px;padding:5px 0;border-bottom:1px solid var(--light)"><div style="color:var(--blue);font-size:14px;flex-shrink:0;margin-top:1px">›</div><div style="font-size:13px;flex:1">${d.text}${d.driveLink?` <a href="${d.driveLink}" target="_blank" class="drive-link" style="margin-left:6px">📁</a>`:''}</div></div>`; });
+      html+=`</div>`;
+    }
+    html+=`</div>`;
+  });
+
+  html+=`<div class="client-total-bar"><span>${summaryMonth} — Total</span><span style="font-size:20px;font-weight:800">${fmtAUD(total)}</span></div>`;
+  document.getElementById('main-content').innerHTML=html;
+}
+
+// ============================================================
+// CLIENT SUMMARY
+// ============================================================
+function renderClientSummary(mon) {
+  if (mon) clientMonth=mon;
+  const projects=DATA.projects.filter(p=>p.month===clientMonth&&p.showClient);
+  const total=projects.reduce((s,p)=>s+Number(p.value||0),0);
+
+  let html=`<div class="filter-bar"><select class="filter-select" onchange="renderClientSummary(this.value)">${MONTHS.map(m=>`<option value="${m}" ${m===clientMonth?'selected':''}>${m}</option>`).join('')}</select></div>
+    <div class="client-month-header"><div class="client-month-title">Monthly Delivery Summary</div><div class="client-month-sub">Drake Content × BLUETTI Australia · ${clientMonth}</div></div>`;
+
+  if (!projects.length) { html+=`<div class="empty-state"><div class="empty-icon">📋</div><p>No deliverables recorded for ${clientMonth} yet.</p></div>`; document.getElementById('main-content').innerHTML=html; return; }
+
+  projects.forEach(p=>{
+    html+=`<div class="client-project-card">
+      <div class="client-project-header">
+        <div>
+          <div class="client-project-name">${p.name}</div>
+          <div style="margin-top:5px;display:flex;gap:8px;flex-wrap:wrap">${catBadge(p.category)} ${statusBadge(p.status)}${p.driveLink?` <a href="${p.driveLink}" target="_blank" class="drive-link">📁 Project Files</a>`:''}</div>
+        </div>
+      </div>
+      <div class="client-deliverables">`;
+    if (p.deliverables&&p.deliverables.length) {
+      p.deliverables.forEach(d=>{ html+=`<div class="client-deliverable"><div class="client-dot">›</div><div style="font-size:13px;line-height:1.6;flex:1">${d.text}${d.driveLink?` <a href="${d.driveLink}" target="_blank" class="drive-link" style="margin-left:6px">📁 Files</a>`:''}</div></div>`; });
+    } else {
+      html+=`<div style="color:var(--muted);font-style:italic;font-size:13px;padding:8px 0">Deliverables to be confirmed.</div>`;
+    }
+    html+=`</div></div>`;
+  });
+
+  document.getElementById('main-content').innerHTML=html;
+}
+
+// ============================================================
+// SLACK & AUTOMATION (admin only)
+// ============================================================
+const DOW = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+
+async function renderSlackSettings() {
+  const mc = document.getElementById('main-content');
+  mc.innerHTML = `<div class="empty-state"><div class="empty-icon">💬</div><p>Loading Slack settings…</p></div>`;
+
+  let cfg = DATA.slack || {};
+  let channels = [], tokenConfigured = false;
+  try {
+    const st = await API.getSlack(); cfg = st.slack || cfg; tokenConfigured = st.tokenConfigured;
+    if (tokenConfigured) { const ch = await API.slackChannels(); channels = ch.channels || []; }
+  } catch (e) { /* show form anyway */ }
+  DATA.slack = cfg;
+  if (activeSection !== 'slack') return; // user navigated away while loading
+
+  const chOptions = (sel) => `<option value="">— none —</option>` +
+    channels.map(c=>`<option value="${c.id}" ${c.id===sel?'selected':''}>#${c.name}${c.isPrivate?' 🔒':''}</option>`).join('');
+
+  const tokenWarn = tokenConfigured ? '' :
+    `<div class="alert" style="background:var(--red-light);color:#991b1b">
+      ⚠ No Slack bot token configured. Set the <code>SLACK_BOT_TOKEN</code> environment variable on your host
+      (see README), then reload. Until then, channel lists and posting are disabled.</div>`;
+
+  const dayOpts = (sel) => DOW.map((d,i)=>`<option value="${i}" ${i===Number(sel)?'selected':''}>${d}</option>`).join('');
+  const monthDayOpts = (sel) => `<option value="last" ${sel==='last'?'selected':''}>Last day of month</option>` +
+    Array.from({length:28},(_,i)=>i+1).map(d=>`<option value="${d}" ${String(sel)===String(d)?'selected':''}>Day ${d}</option>`).join('');
+
+  mc.innerHTML = `
+    ${tokenWarn}
+    <div class="card slack-form">
+      <div class="card-header"><div class="card-title">💬 Slack Automation</div></div>
+      <div class="card-body">
+        <div class="modal-field"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;text-transform:none;font-size:14px;letter-spacing:0">
+          <input type="checkbox" id="sl-enabled" ${cfg.enabled?'checked':''}> <strong>Enable scheduled posts</strong></label>
+          <div class="slack-note">When off, nothing is posted automatically (you can still use “Post now” below).</div>
+        </div>
+        <div class="modal-field"><label>Timezone</label><input type="text" id="sl-tz" value="${cfg.timezone||'Australia/Sydney'}" placeholder="Australia/Sydney">
+          <div class="slack-note">IANA timezone name. Schedule times below are in this zone.</div></div>
+      </div>
+    </div>
+
+    <div class="card slack-form">
+      <div class="card-header"><div class="card-title">📅 Weekly — Due This Week</div></div>
+      <div class="card-body">
+        <div class="field-row">
+          <div class="modal-field"><label>Channel</label><select id="sl-weekly-ch">${chOptions(cfg.weeklyChannel)}</select></div>
+          <div class="modal-field"><label>Day</label><select id="sl-weekly-day">${dayOpts(cfg.weeklyDay)}</select></div>
+        </div>
+        <div class="modal-field"><label>Time</label><input type="time" id="sl-weekly-time" value="${cfg.weeklyTime||'09:00'}"></div>
+        <div class="slack-actions-row">
+          <button class="btn btn-outline btn-sm" ${tokenConfigured?'':'disabled'} onclick="testSlack('sl-weekly-ch')">Send test</button>
+          <button class="btn btn-outline btn-sm" ${tokenConfigured?'':'disabled'} onclick="runSlack('weekly')">Post now</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card slack-form">
+      <div class="card-header"><div class="card-title">🚨 Weekly — Overdue Reminder</div></div>
+      <div class="card-body">
+        <div class="modal-field"><label>Channel</label><select id="sl-overdue-ch">${chOptions(cfg.overdueChannel)}</select>
+          <div class="slack-note">Posted on the same day/time as the weekly summary above.</div></div>
+        <div class="slack-actions-row">
+          <button class="btn btn-outline btn-sm" ${tokenConfigured?'':'disabled'} onclick="testSlack('sl-overdue-ch')">Send test</button>
+          <button class="btn btn-outline btn-sm" ${tokenConfigured?'':'disabled'} onclick="runSlack('overdue')">Post now</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card slack-form">
+      <div class="card-header"><div class="card-title">💰 Monthly Summary</div></div>
+      <div class="card-body">
+        <div class="field-row">
+          <div class="modal-field"><label>Channel</label><select id="sl-monthly-ch">${chOptions(cfg.monthlyChannel)}</select></div>
+          <div class="modal-field"><label>Day</label><select id="sl-monthly-day">${monthDayOpts(cfg.monthlyDay)}</select></div>
+        </div>
+        <div class="modal-field"><label>Time</label><input type="time" id="sl-monthly-time" value="${cfg.monthlyTime||'17:00'}"></div>
+        <div class="slack-actions-row">
+          <button class="btn btn-outline btn-sm" ${tokenConfigured?'':'disabled'} onclick="testSlack('sl-monthly-ch')">Send test</button>
+          <button class="btn btn-outline btn-sm" ${tokenConfigured?'':'disabled'} onclick="runSlack('monthly')">Post now</button>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;justify-content:flex-end;gap:10px;margin-bottom:24px">
+      <button class="btn btn-primary" onclick="saveSlackSettings()">Save settings</button>
+    </div>
+
+    <div class="card slack-form">
+      <div class="card-header"><div class="card-title">💾 Backup</div></div>
+      <div class="card-body">
+        <div class="slack-note" style="margin-bottom:10px">Download a complete copy of all projects, tasks, goals and settings as a JSON file. Keep this somewhere safe as your backup.</div>
+        <button class="btn btn-outline btn-sm" onclick="exportBackup()">⬇ Export backup (JSON)</button>
+      </div>
+    </div>`;
+}
+
+function exportBackup() {
+  API.exportData().then((data) => {
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'bluetti-portal-backup-' + new Date().toISOString().slice(0, 10) + '.json';
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+  }).catch((e) => alert('Export failed: ' + e.message));
+}
+
+function saveSlackSettings() {
+  const v = (id) => document.getElementById(id).value;
+  const body = {
+    enabled: document.getElementById('sl-enabled').checked,
+    timezone: v('sl-tz').trim() || 'Australia/Sydney',
+    weeklyChannel: v('sl-weekly-ch'),
+    weeklyDay: parseInt(v('sl-weekly-day'), 10),
+    weeklyTime: v('sl-weekly-time') || '09:00',
+    overdueChannel: v('sl-overdue-ch'),
+    monthlyChannel: v('sl-monthly-ch'),
+    monthlyDay: v('sl-monthly-day'),
+    monthlyTime: v('sl-monthly-time') || '17:00',
+  };
+  mutate(() => API.setSlack(body), () => { alert('Slack settings saved.'); renderSlackSettings(); });
+}
+
+function testSlack(selectId) {
+  const ch = document.getElementById(selectId).value;
+  if (!ch) { alert('Pick a channel first.'); return; }
+  API.slackTest(ch).then(() => alert('Test message sent ✓')).catch(e => alert('Failed: ' + e.message));
+}
+function runSlack(kind) {
+  if (!confirm('Post the ' + kind + ' message to Slack now?')) return;
+  API.slackRun(kind).then(() => alert(kind + ' message posted ✓')).catch(e => alert('Failed: ' + e.message));
+}
+</script>
+</body>
+</html>

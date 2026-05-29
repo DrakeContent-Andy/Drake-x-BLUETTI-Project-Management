@@ -1,0 +1,21 @@
+{
+  "name": "bluetti-portal",
+  "version": "2.0.0",
+  "description": "Drake Content x BLUETTI project management portal — Express + Postgres + Slack",
+  "type": "module",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node --watch server/index.js",
+    "seed": "node server/seed.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@slack/web-api": "^7.8.0",
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "pg": "^8.13.1"
+  }
+}

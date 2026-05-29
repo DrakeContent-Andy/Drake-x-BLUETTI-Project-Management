@@ -1,0 +1,25 @@
+# Render Blueprint — deploys the portal as a free web service.
+# In Render: New → Blueprint → connect this repo. Then add the secret env vars
+# (DATABASE_URL, AUTH_SECRET, CRON_SECRET, SLACK_BOT_TOKEN, passwords) in the dashboard.
+services:
+  - type: web
+    name: bluetti-portal
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: AUTH_SECRET
+        sync: false
+      - key: CRON_SECRET
+        sync: false
+      - key: SLACK_BOT_TOKEN
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: TEAM_PASSWORD
+        sync: false
+      - key: CLIENT_PASSWORD
+        sync: false
