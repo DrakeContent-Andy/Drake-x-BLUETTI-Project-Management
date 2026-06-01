@@ -57,6 +57,30 @@ export async function initSchema() {
       target      TEXT DEFAULT ''
     );
 
+    -- Monthly Plan brainstorm: a planned (free-text) project per month, each
+    -- with multiple proposed approaches (Plan A/B/C) stored in options JSONB
+    -- as [{ label, description, recommended }].
+    CREATE TABLE IF NOT EXISTS plans (
+      id            SERIAL PRIMARY KEY,
+      month         TEXT NOT NULL,
+      project_name  TEXT NOT NULL,
+      note          TEXT DEFAULT '',
+      options       JSONB DEFAULT '[]'::jsonb,
+      sort_order    INTEGER DEFAULT 0
+    );
+
+    -- Reports & Results: outcome updates tied to a project + month, each with
+    -- multiple sub-results stored in results JSONB as [{ text, link }].
+    CREATE TABLE IF NOT EXISTS reports (
+      id            SERIAL PRIMARY KEY,
+      project_id    INTEGER,
+      month         TEXT DEFAULT '',
+      title         TEXT DEFAULT '',
+      results       JSONB DEFAULT '[]'::jsonb,
+      show_client   BOOLEAN DEFAULT TRUE,
+      sort_order    INTEGER DEFAULT 0
+    );
+
     CREATE TABLE IF NOT EXISTS settings (
       key   TEXT PRIMARY KEY,
       value JSONB NOT NULL

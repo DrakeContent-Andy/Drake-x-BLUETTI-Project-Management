@@ -184,6 +184,8 @@ tr:hover td{background:#fafafa}
 .slack-form{max-width:640px}
 .slack-actions-row{display:flex;gap:10px;align-items:center;margin:14px 0;flex-wrap:wrap}
 .slack-note{font-size:12px;color:var(--muted);margin-top:4px}
+.plan-option{border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px;background:var(--light)}
+.plan-option-rec{border-color:var(--green);background:#f0fdf4}
 </style>
 </head>
 <body>
@@ -242,7 +244,7 @@ tr:hover td{background:#fafafa}
 // ============================================================
 // CONSTANTS
 // ============================================================
-const MONTHS = ['January 2026','February 2026','March 2026','April 2026','May 2026','June 2026'];
+const MONTHS = ['January 2026','February 2026','March 2026','April 2026','May 2026','June 2026','July 2026','August 2026','September 2026','October 2026','November 2026','December 2026'];
 const PROJECT_CATS = ['Testimonial','KOL/Influencer','PR','Paid Ads','Social Media','Event/Campaign','Other'];
 const TASK_CATS = ['Shoot Plan','KOC','KOL','PR','Social Media','Creative','General'];
 
@@ -256,7 +258,8 @@ let DATA = {
   settings: { assignees: [] },
   projects: [],
   tasks: [],
-  monthlyGoals: [],
+  plans: [],
+  reports: [],
   slack: null,
 };
 
@@ -268,7 +271,8 @@ let activeSection = null;
 let activeTaskCat = 'Shoot Plan';
 let projectFilterMonth = 'All';
 let projectFilterCat = 'All';
-let goalsMonth = 'May 2026';
+let planMonth = 'May 2026';
+let reportMonth = 'All';
 let clientMonth = 'April 2026';
 let summaryMonth = 'March 2026';
 
@@ -300,9 +304,12 @@ const API = {
   createTask(b)        { return API.req('POST', '/tasks', b); },
   updateTask(id, b)    { return API.req('PATCH', '/tasks/' + id, b); },
   deleteTask(id)       { return API.req('DELETE', '/tasks/' + id); },
-  createGoal(b)        { return API.req('POST', '/goals', b); },
-  updateGoal(id, b)    { return API.req('PATCH', '/goals/' + id, b); },
-  deleteGoal(id)       { return API.req('DELETE', '/goals/' + id); },
+  createPlan(b)        { return API.req('POST', '/plans', b); },
+  updatePlan(id, b)    { return API.req('PATCH', '/plans/' + id, b); },
+  deletePlan(id)       { return API.req('DELETE', '/plans/' + id); },
+  createReport(b)      { return API.req('POST', '/reports', b); },
+  updateReport(id, b)  { return API.req('PATCH', '/reports/' + id, b); },
+  deleteReport(id)     { return API.req('DELETE', '/reports/' + id); },
   setAssignees(list)   { return API.req('PATCH', '/settings/assignees', { assignees:list }); },
   getSlack()           { return API.req('GET', '/settings/slack'); },
   setSlack(b)          { return API.req('PATCH', '/settings/slack', b); },
@@ -330,7 +337,8 @@ async function refreshState() {
     const s = await API.getState();
     DATA.projects = s.projects || [];
     DATA.tasks = s.tasks || [];
-    DATA.monthlyGoals = s.monthlyGoals || [];
+    DATA.plans = s.plans || [];
+    DATA.reports = s.reports || [];
     DATA.settings = s.settings || { assignees: [] };
     DATA.slack = s.slack;
     setConn('');
@@ -371,8 +379,9 @@ function stopPolling() { if (pollTimer) clearInterval(pollTimer); pollTimer = nu
 
 function rerender() {
   if (document.getElementById('modal-overlay').classList.contains('open')) return;
-  ({ dashboard:renderDashboard, projects:renderProjects, tasks:renderTasks, goals:renderGoals,
-     summaries:renderSummaries, 'client-summary':renderClientSummary, slack:renderSlackSettings
+  ({ dashboard:renderDashboard, projects:renderProjects, tasks:renderTasks, plans:renderPlans,
+     reports:renderReports, summaries:renderSummaries, 'client-summary':renderClientSummary,
+     slack:renderSlackSettings
    }[activeSection] || function(){})();
 }
 
@@ -450,7 +459,8 @@ function buildNav() {
   const nav = document.getElementById('sidebar-nav');
   if (currentUser==='client') {
     nav.innerHTML = `<div class="nav-section">Client Portal</div>
-      <div class="nav-item" data-sec="client-summary" onclick="showSection('client-summary')"><span class="nav-icon">📋</span>Monthly Summary</div>`;
+      <div class="nav-item" data-sec="client-summary" onclick="showSection('client-summary')"><span class="nav-icon">📋</span>Monthly Summary</div>
+      <div class="nav-item" data-sec="reports" onclick="showSection('reports')"><span class="nav-icon">📈</span>Reports & Results</div>`;
     return;
   }
   // admin + team share most nav; admin gets Monthly Summaries
@@ -459,8 +469,9 @@ function buildNav() {
     <div class="nav-section">Work</div>
     <div class="nav-item" data-sec="projects" onclick="showSection('projects')"><span class="nav-icon">📁</span>Projects</div>
     <div class="nav-item" data-sec="tasks" onclick="showSection('tasks')"><span class="nav-icon">✅</span>Tasks</div>
+    <div class="nav-item" data-sec="reports" onclick="showSection('reports')"><span class="nav-icon">📈</span>Reports & Results</div>
     <div class="nav-section">Planning</div>
-    <div class="nav-item" data-sec="goals" onclick="showSection('goals')"><span class="nav-icon">🎯</span>Monthly Goals</div>`;
+    <div class="nav-item" data-sec="plans" onclick="showSection('plans')"><span class="nav-icon">🧠</span>Monthly Plan</div>`;
   if (currentUser==='admin') {
     html += `<div class="nav-item" data-sec="summaries" onclick="showSection('summaries')"><span class="nav-icon">💰</span>Monthly Summaries</div>
       <div class="nav-section">Settings</div>
@@ -472,9 +483,9 @@ function buildNav() {
 function showSection(sec) {
   activeSection = sec;
   document.querySelectorAll('.nav-item').forEach(el => el.classList.toggle('active', el.dataset.sec===sec));
-  const titles = { dashboard:'Dashboard', projects:'Projects', tasks:'Tasks', goals:'Monthly Goals', summaries:'Monthly Summaries', 'client-summary':'Monthly Delivery Summary', slack:'Slack & Automation' };
+  const titles = { dashboard:'Dashboard', projects:'Projects', tasks:'Tasks', plans:'Monthly Plan', reports:'Reports & Results', summaries:'Monthly Summaries', 'client-summary':'Monthly Delivery Summary', slack:'Slack & Automation' };
   document.getElementById('topbar-title').textContent = titles[sec]||sec;
-  ({ dashboard:renderDashboard, projects:renderProjects, tasks:renderTasks, goals:renderGoals, summaries:renderSummaries, 'client-summary':renderClientSummary, slack:renderSlackSettings }[sec]||function(){})();
+  ({ dashboard:renderDashboard, projects:renderProjects, tasks:renderTasks, plans:renderPlans, reports:renderReports, summaries:renderSummaries, 'client-summary':renderClientSummary, slack:renderSlackSettings }[sec]||function(){})();
 }
 
 // ============================================================
@@ -496,6 +507,7 @@ function taskCatColor(c) {
   return { 'Shoot Plan':'#2563eb','KOC':'#16a34a','KOL':'#7c3aed','PR':'#0891b2','Social Media':'#ea580c','Creative':'#d97706','General':'#64748b' }[c]||'#64748b';
 }
 function fmtAUD(n) { return 'AUD $'+Number(n).toLocaleString('en-AU',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function esc(s) { return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function isOverdue(d,s) { if(!d||s==='Done'||s==='Completed'||s==='Void') return false; return new Date(d)<new Date(new Date().toDateString()); }
 function driveLinkHTML(url, label) {
   if (!url) return '';
@@ -514,7 +526,9 @@ function renderDashboard() {
   const activeProjects=DATA.projects.filter(p=>p.status!=='Completed').length;
   const today=new Date(); const weekEnd=new Date(today); weekEnd.setDate(today.getDate()+7);
   const dueThisWeek=DATA.tasks.filter(t=>{ if(!t.dueDate||t.status==='Done') return false; const d=new Date(t.dueDate); return d>=today&&d<=weekEnd; });
-  const currentGoals=DATA.monthlyGoals.find(g=>g.month==='May 2026')||DATA.monthlyGoals[0];
+  const planMonthsList=[...new Set(DATA.plans.map(p=>p.month))].sort((a,b)=>MONTHS.indexOf(a)-MONTHS.indexOf(b));
+  const curPlanMonth=planMonthsList.length?planMonthsList[planMonthsList.length-1]:null;
+  const curPlans=curPlanMonth?DATA.plans.filter(p=>p.month===curPlanMonth):[];
 
   let html = `<div class="stat-grid">
     <div class="stat-card"><div class="stat-label">Active Projects</div><div class="stat-value" style="color:var(--blue)">${activeProjects}</div><div class="stat-sub">in production / planning</div></div>
@@ -529,9 +543,12 @@ function renderDashboard() {
     html+=`</tbody></table></div></div>`;
   }
 
-  if (currentGoals) {
-    html+=`<div class="card"><div class="card-header"><div class="card-title">🎯 ${currentGoals.month} Goals</div><button class="btn btn-sm btn-ghost" onclick="showSection('goals')">View all →</button></div><div class="card-body">`;
-    currentGoals.goals.forEach(g=>{ html+=`<div class="goal-item"><div class="goal-cat-dot" style="background:${taskCatColor(g.category)}"></div><div class="goal-desc">${g.description}</div><div class="goal-target">${g.target}</div></div>`; });
+  if (curPlans.length) {
+    html+=`<div class="card"><div class="card-header"><div class="card-title">🧠 ${curPlanMonth} — Monthly Plan</div><button class="btn btn-sm btn-ghost" onclick="showSection('plans')">View all →</button></div><div class="card-body">`;
+    curPlans.forEach(p=>{
+      const rec=(p.options||[]).find(o=>o.recommended);
+      html+=`<div class="goal-item"><div class="goal-cat-dot" style="background:var(--purple,#7c3aed)"></div><div style="flex:1"><div class="goal-desc">${esc(p.projectName)}</div>${rec?`<span style="font-size:11px;color:var(--green);font-weight:700">★ ${esc(rec.label)}</span>`:`<span style="font-size:11px;color:var(--muted)">${(p.options||[]).length} option${(p.options||[]).length!==1?'s':''}</span>`}</div></div>`;
+    });
     html+=`</div></div>`;
   }
 
@@ -563,7 +580,8 @@ function renderProjects(fMonth, fCat) {
       <option value="All" ${projectFilterCat==='All'?'selected':''}>All Categories</option>
       ${PROJECT_CATS.map(c=>`<option value="${c}" ${c===projectFilterCat?'selected':''}>${c}</option>`).join('')}
     </select>
-    <button class="btn btn-primary" onclick="addProjectModal()" style="margin-left:auto">+ New Project</button>
+    <button class="btn btn-outline" onclick="exportProjectsCSV()" style="margin-left:auto">⬇ Export CSV</button>
+    <button class="btn btn-primary" onclick="addProjectModal()">+ New Project</button>
   </div>`;
 
   if (!projects.length) { html+=`<div class="empty-state"><div class="empty-icon">📁</div><p>No projects match this filter.</p></div>`; document.getElementById('main-content').innerHTML=html; return; }
@@ -692,6 +710,31 @@ function deleteDeliverableM(pid,idx) {
   mutate(()=>API.updateProject(pid,{deliverables:dels}), ()=>{ closeModal(); renderProjects(); });
 }
 
+// Export the currently-filtered projects as a Google Sheets–friendly CSV.
+// Columns: Project | Link | Value. Each project is one row, followed by a
+// row per deliverable (its breakdown) beneath it.
+function exportProjectsCSV() {
+  const showValue = currentUser==='admin';
+  const projects=DATA.projects.filter(p=>(projectFilterMonth==='All'||p.month===projectFilterMonth)&&(projectFilterCat==='All'||p.category===projectFilterCat));
+  if(!projects.length){ alert('No projects to export for this filter.'); return; }
+  const q=(s)=>{ s=String(s==null?'':s); return /[",\n\r]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; };
+  const rows=[['Project','Link',showValue?'Value (AUD)':'Value']];
+  let grand=0;
+  projects.forEach(p=>{
+    if(showValue) grand+=Number(p.value||0);
+    rows.push([p.name, p.driveLink||'', showValue?Number(p.value||0).toFixed(2):'']);
+    (p.deliverables||[]).forEach(d=>{ rows.push(['   • '+(d.text||''), d.driveLink||'', '']); });
+  });
+  if(showValue) rows.push(['TOTAL','',grand.toFixed(2)]);
+  const csv=rows.map(r=>r.map(q).join(',')).join('\r\n');
+  const blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const scope=projectFilterMonth==='All'?'all-months':projectFilterMonth.replace(/\s+/g,'-');
+  const a=document.createElement('a');
+  a.href=url; a.download='bluetti-projects-'+scope.toLowerCase()+'.csv';
+  document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+}
+
 // ============================================================
 // TASKS
 // ============================================================
@@ -807,39 +850,139 @@ function deleteAssignee(idx) {
 }
 
 // ============================================================
-// MONTHLY GOALS
+// MONTHLY PLAN  (brainstorm — replaces Monthly Goals)
 // ============================================================
-function renderGoals(mon) {
-  if (mon) goalsMonth=mon;
-  const entry=DATA.monthlyGoals.find(g=>g.month===goalsMonth)||{month:goalsMonth,goals:[]};
+function renderPlans(mon) {
+  if (mon) planMonth=mon;
+  const plans=DATA.plans.filter(p=>p.month===planMonth);
 
-  let html=`<div class="filter-bar"><select class="filter-select" onchange="renderGoals(this.value)">${MONTHS.map(m=>`<option value="${m}" ${m===goalsMonth?'selected':''}>${m}</option>`).join('')}</select><button class="btn btn-primary" onclick="addGoalModal('${goalsMonth}')" style="margin-left:auto">+ Add Goal</button></div>`;
+  let html=`<div class="filter-bar"><select class="filter-select" onchange="renderPlans(this.value)">${MONTHS.map(m=>`<option value="${m}" ${m===planMonth?'selected':''}>${m}</option>`).join('')}</select><button class="btn btn-primary" onclick="planModal(null)" style="margin-left:auto">+ New Plan</button></div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:14px">Brainstorm the projects you'll propose for <b>${planMonth}</b>. Add multiple approaches (Plan A / B / C) per project and mark the one you recommend — ready to walk through with the client.</div>`;
 
-  if (!entry.goals.length) { html+=`<div class="empty-state"><div class="empty-icon">🎯</div><p>No goals set for ${goalsMonth} yet.</p></div>`; document.getElementById('main-content').innerHTML=html; return; }
+  if (!plans.length) { html+=`<div class="empty-state"><div class="empty-icon">🧠</div><p>No plans for ${planMonth} yet. Click "+ New Plan" to start brainstorming.</p></div>`; document.getElementById('main-content').innerHTML=html; return; }
 
-  html+=`<div class="card"><div class="card-header"><div class="card-title">🎯 ${goalsMonth} — Monthly Goals</div></div><div class="card-body">`;
-  entry.goals.forEach(g=>{ html+=`<div class="goal-item"><div class="goal-cat-dot" style="background:${taskCatColor(g.category)}"></div><div><div class="goal-desc">${g.description}</div><span style="font-size:11px;color:${taskCatColor(g.category)};font-weight:600">${g.category}</span></div><div class="goal-target">${g.target}</div><div style="display:flex;gap:4px;flex-shrink:0"><button class="btn btn-sm btn-ghost" onclick="editGoalModal('${goalsMonth}',${g.id})">✎</button><button class="btn btn-sm btn-ghost" onclick="deleteGoal('${goalsMonth}',${g.id})" style="color:var(--red)">✕</button></div></div>`; });
-  html+=`</div></div>`;
+  plans.forEach(p=>{
+    html+=`<div class="card" style="margin-bottom:14px"><div class="card-header"><div style="flex:1;min-width:0"><div style="font-weight:800;font-size:15px">${esc(p.projectName)}</div>${p.note?`<div style="font-size:12px;color:var(--muted);margin-top:4px;white-space:pre-wrap">${esc(p.note)}</div>`:''}</div><div style="display:flex;gap:4px;flex-shrink:0"><button class="btn btn-sm btn-ghost" onclick="planModal(DATA.plans.find(x=>x.id===${p.id}))">✎</button><button class="btn btn-sm btn-ghost" style="color:var(--red)" onclick="deletePlan(${p.id})">✕</button></div></div><div style="padding:8px 18px 16px">`;
+    if (p.options&&p.options.length) {
+      p.options.forEach(o=>{
+        html+=`<div class="plan-option ${o.recommended?'plan-option-rec':''}"><div style="display:flex;align-items:center;gap:8px;margin-bottom:3px"><span style="font-weight:700;font-size:13px">${esc(o.label)}</span>${o.recommended?'<span class="badge badge-green">★ Recommended</span>':''}</div>${o.description?`<div style="font-size:13px;line-height:1.5;white-space:pre-wrap">${esc(o.description)}</div>`:'<div style="font-size:12px;color:var(--muted);font-style:italic">No detail yet.</div>'}</div>`;
+      });
+    } else { html+=`<div style="color:var(--muted);font-style:italic;font-size:13px">No approaches added yet — click ✎ to add Plan A / B / C.</div>`; }
+    html+=`</div></div>`;
+  });
   document.getElementById('main-content').innerHTML=html;
 }
 
-function goalFormHTML(g) {
-  const cats=['Testimonial','KOL','KOC','PR','Social Media','Paid Ads','Shoot','Creative','General'];
-  return `<div class="modal-field"><label>Goal Description</label><input type="text" id="gl-desc" value="${(g&&g.description||'').replace(/"/g,'&quot;')}" placeholder="e.g. Complete 3 testimonial edits"></div>
-    <div class="field-row"><div class="modal-field"><label>Category</label><select id="gl-cat">${cats.map(c=>`<option value="${c}" ${g&&g.category===c?'selected':''}>${c}</option>`).join('')}</select></div><div class="modal-field"><label>Target</label><input type="text" id="gl-target" value="${(g&&g.target||'').replace(/"/g,'&quot;')}" placeholder="e.g. 3 edits"></div></div>`;
+function planOptionRowHTML(opt) {
+  opt=opt||{label:'',description:'',recommended:false};
+  return `<div class="plan-opt-row" data-row style="border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:8px">
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px">
+      <input type="text" class="po-label" value="${esc(opt.label)}" placeholder="Plan A" style="flex:0 0 120px">
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);cursor:pointer"><input type="radio" name="plan-rec" class="po-rec" ${opt.recommended?'checked':''}> Recommended</label>
+      <button type="button" class="btn btn-sm btn-ghost" style="color:var(--red);margin-left:auto" onclick="this.closest('[data-row]').remove()">✕</button>
+    </div>
+    <textarea class="po-desc" rows="2" placeholder="Approach, pros / cons, why this could work…">${esc(opt.description)}</textarea>
+  </div>`;
 }
-function addGoalModal(month) { openModal(`<div class="modal-title">Add Goal — ${month}</div>${goalFormHTML(null)}<div class="modal-actions"><button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveNewGoal('${month}')">Add Goal</button></div>`); }
-function saveNewGoal(month) {
-  const desc=document.getElementById('gl-desc').value.trim(); if(!desc) return;
-  const body={ month, category:document.getElementById('gl-cat').value, description:desc, target:document.getElementById('gl-target').value };
-  mutate(()=>API.createGoal(body), ()=>{ closeModal(); renderGoals(month); });
+function addPlanOptionRow() { document.getElementById('plan-opts').insertAdjacentHTML('beforeend', planOptionRowHTML(null)); }
+function collectPlanOptions() {
+  return [...document.querySelectorAll('#plan-opts [data-row]')].map(r=>({
+    label:r.querySelector('.po-label').value.trim(),
+    description:r.querySelector('.po-desc').value.trim(),
+    recommended:r.querySelector('.po-rec').checked,
+  })).filter(o=>o.label||o.description).map(o=>({ label:o.label||'Plan', description:o.description, recommended:o.recommended }));
 }
-function editGoalModal(month,id) { const entry=DATA.monthlyGoals.find(g=>g.month===month); const g=entry&&entry.goals.find(x=>x.id===id); openModal(`<div class="modal-title">Edit Goal</div>${goalFormHTML(g)}<div class="modal-actions"><button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveGoalEdit('${month}',${id})">Save</button></div>`); }
-function saveGoalEdit(month,id) {
-  const body={ description:document.getElementById('gl-desc').value, category:document.getElementById('gl-cat').value, target:document.getElementById('gl-target').value };
-  mutate(()=>API.updateGoal(id, body), ()=>{ closeModal(); renderGoals(month); });
+function planModal(plan) {
+  const isEdit=!!plan;
+  const opts=(plan&&plan.options&&plan.options.length)?plan.options:[{label:'Plan A',description:'',recommended:true},{label:'Plan B',description:'',recommended:false}];
+  openModal(`<div class="modal-title">${isEdit?'Edit Plan':'New Plan'} — ${esc(plan?plan.month:planMonth)}</div>
+    <div class="modal-field"><label>Project / Idea Name</label><input type="text" id="plan-name" value="${esc(plan?plan.projectName:'')}" placeholder="e.g. EP2000 Spring Campaign"></div>
+    <div class="modal-field"><label>Context / Note <span style="font-weight:400;color:var(--muted)">(optional)</span></label><textarea id="plan-note" rows="2" placeholder="Background, objective, who's involved…">${esc(plan?plan.note:'')}</textarea></div>
+    <div class="modal-field"><label>Proposed Approaches</label><div id="plan-opts">${opts.map(o=>planOptionRowHTML(o)).join('')}</div>
+      <button type="button" class="btn btn-sm btn-outline" style="margin-top:8px" onclick="addPlanOptionRow()">+ Add another approach</button>
+      <div style="font-size:11px;color:var(--muted);margin-top:6px">Tick "Recommended" on the approach you think is most achievable &amp; beneficial.</div>
+    </div>
+    <div class="modal-actions"><button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="savePlan(${plan?plan.id:'null'})">${isEdit?'Save':'Create Plan'}</button></div>`);
 }
-function deleteGoal(month,id) { mutate(()=>API.deleteGoal(id), ()=>renderGoals(month)); }
+function savePlan(id) {
+  const projectName=document.getElementById('plan-name').value.trim(); if(!projectName){ alert('Enter a project / idea name.'); return; }
+  const body={ projectName, note:document.getElementById('plan-note').value, options:collectPlanOptions() };
+  if(id){ mutate(()=>API.updatePlan(id,body), ()=>{ closeModal(); renderPlans(); }); }
+  else { body.month=planMonth; mutate(()=>API.createPlan(body), ()=>{ closeModal(); renderPlans(); }); }
+}
+function deletePlan(id) { if(!confirm('Delete this plan?')) return; mutate(()=>API.deletePlan(id), renderPlans); }
+
+// ============================================================
+// REPORTS & RESULTS  (visible to client too)
+// ============================================================
+function reportProjectName(pid) { const p=DATA.projects.find(x=>x.id===pid); return p?p.name:''; }
+
+function renderReports(mon) {
+  if (mon!==undefined) reportMonth=mon;
+  const canEdit = currentUser!=='client';
+  let list=DATA.reports.slice();
+  if (reportMonth!=='All') list=list.filter(r=>r.month===reportMonth);
+  list.sort((a,b)=>{ const d=MONTHS.indexOf(a.month)-MONTHS.indexOf(b.month); return d!==0?d:a.id-b.id; });
+
+  let html=`<div class="filter-bar"><select class="filter-select" onchange="renderReports(this.value)"><option value="All" ${reportMonth==='All'?'selected':''}>All Months</option>${MONTHS.map(m=>`<option value="${m}" ${m===reportMonth?'selected':''}>${m}</option>`).join('')}</select>${canEdit?`<button class="btn btn-primary" onclick="reportModal(null)" style="margin-left:auto">+ New Report</button>`:''}</div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:14px">Outcome updates &amp; results for published work — linked to each project.</div>`;
+
+  if (!list.length) { html+=`<div class="empty-state"><div class="empty-icon">📈</div><p>No reports${reportMonth==='All'?'':' for '+reportMonth} yet.</p></div>`; document.getElementById('main-content').innerHTML=html; return; }
+
+  list.forEach(r=>{
+    const pname=reportProjectName(r.projectId);
+    const projBit = pname ? ` · ${canEdit?`<a href="#" onclick="goToProject(${r.projectId});return false" class="drive-link">📁 ${esc(pname)}</a>`:`📁 ${esc(pname)}`}` : '';
+    html+=`<div class="card" style="margin-bottom:14px"><div class="card-header"><div style="flex:1;min-width:0"><div style="font-weight:800;font-size:15px">${esc(r.title||'(untitled report)')}</div><div style="font-size:12px;color:var(--muted);margin-top:4px">${r.month?esc(r.month):''}${projBit}</div></div>${canEdit?`<div style="display:flex;gap:4px;flex-shrink:0"><button class="btn btn-sm btn-ghost" onclick="reportModal(DATA.reports.find(x=>x.id===${r.id}))">✎</button><button class="btn btn-sm btn-ghost" style="color:var(--red)" onclick="deleteReport(${r.id})">✕</button></div>`:''}</div><div style="padding:4px 20px 14px">`;
+    if (r.results&&r.results.length) {
+      r.results.forEach(res=>{ html+=`<div style="display:flex;align-items:flex-start;gap:8px;padding:6px 0;border-bottom:1px solid var(--light)"><div style="color:var(--blue);flex-shrink:0;margin-top:1px">›</div><div style="font-size:13px;flex:1;line-height:1.5;white-space:pre-wrap">${esc(res.text)}${res.link?` <a href="${esc(res.link)}" target="_blank" class="drive-link" style="margin-left:6px">🔗 View</a>`:''}</div></div>`; });
+    } else { html+=`<div style="color:var(--muted);font-style:italic;font-size:13px;padding:6px 0">No results recorded yet.</div>`; }
+    html+=`</div></div>`;
+  });
+  document.getElementById('main-content').innerHTML=html;
+}
+function goToProject() { projectFilterMonth='All'; projectFilterCat='All'; showSection('projects'); }
+
+function reportResultRowHTML(res) {
+  res=res||{text:'',link:''};
+  return `<div class="rep-res-row" data-row style="margin-bottom:10px">
+    <div style="display:flex;gap:8px;align-items:flex-start">
+      <textarea class="rr-text" rows="2" placeholder="Result / metric (e.g. REA article published — 12k views)" style="flex:1">${esc(res.text)}</textarea>
+      <button type="button" class="btn btn-sm btn-ghost" style="color:var(--red)" onclick="this.closest('[data-row]').remove()">✕</button>
+    </div>
+    <input type="url" class="rr-link" value="${esc(res.link)}" placeholder="https://link-to-report-or-article (optional)" style="margin-top:4px">
+  </div>`;
+}
+function addReportResultRow() { document.getElementById('rep-results').insertAdjacentHTML('beforeend', reportResultRowHTML(null)); }
+function collectReportResults() {
+  return [...document.querySelectorAll('#rep-results [data-row]')].map(r=>({ text:r.querySelector('.rr-text').value.trim(), link:r.querySelector('.rr-link').value.trim() })).filter(x=>x.text||x.link);
+}
+function reportModal(report) {
+  const isEdit=!!report;
+  const results=(report&&report.results&&report.results.length)?report.results:[{text:'',link:''}];
+  const projOpts=DATA.projects.map(p=>`<option value="${p.id}" ${report&&report.projectId===p.id?'selected':''}>${esc(p.name)}</option>`).join('');
+  const defMonth=report?report.month:(reportMonth!=='All'?reportMonth:'');
+  const monthSel=MONTHS.map(m=>`<option value="${m}" ${defMonth===m?'selected':''}>${m}</option>`).join('');
+  openModal(`<div class="modal-title">${isEdit?'Edit Report':'New Report'}</div>
+    <div class="modal-field"><label>Title</label><input type="text" id="rep-title" value="${esc(report?report.title:'')}" placeholder="e.g. REA Article — Performance Report"></div>
+    <div class="field-row">
+      <div class="modal-field"><label>Project</label><select id="rep-project"><option value="">— none —</option>${projOpts}</select></div>
+      <div class="modal-field"><label>Month</label><select id="rep-month">${monthSel}</select></div>
+    </div>
+    <div class="modal-field"><label>Results <span style="font-weight:400;color:var(--muted)">(add one per outcome)</span></label><div id="rep-results">${results.map(r=>reportResultRowHTML(r)).join('')}</div>
+      <button type="button" class="btn btn-sm btn-outline" style="margin-top:6px" onclick="addReportResultRow()">+ Add another result</button>
+    </div>
+    <div class="modal-field"><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="rep-show" ${!report||report.showClient?'checked':''}> Show on client (Bluetti) portal</label></div>
+    <div class="modal-actions"><button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveReport(${report?report.id:'null'})">${isEdit?'Save':'Create Report'}</button></div>`);
+}
+function saveReport(id) {
+  const title=document.getElementById('rep-title').value.trim();
+  const results=collectReportResults();
+  if(!title && !results.length){ alert('Add a title or at least one result.'); return; }
+  const body={ title, projectId:document.getElementById('rep-project').value||null, month:document.getElementById('rep-month').value, results, showClient:document.getElementById('rep-show').checked };
+  if(id) mutate(()=>API.updateReport(id,body), ()=>{ closeModal(); renderReports(); });
+  else mutate(()=>API.createReport(body), ()=>{ closeModal(); renderReports(); });
+}
+function deleteReport(id) { if(!confirm('Delete this report?')) return; mutate(()=>API.deleteReport(id), renderReports); }
 
 // ============================================================
 // MONTHLY SUMMARIES (admin only)
@@ -903,6 +1046,7 @@ function renderClientSummary(mon) {
           <div class="client-project-name">${p.name}</div>
           <div style="margin-top:5px;display:flex;gap:8px;flex-wrap:wrap">${catBadge(p.category)} ${statusBadge(p.status)}${p.driveLink?` <a href="${p.driveLink}" target="_blank" class="drive-link">📁 Project Files</a>`:''}</div>
         </div>
+        ${p.value!=null?`<div style="font-size:15px;font-weight:800;color:var(--green);white-space:nowrap">${fmtAUD(p.value)}</div>`:''}
       </div>
       <div class="client-deliverables">`;
     if (p.deliverables&&p.deliverables.length) {
@@ -913,6 +1057,9 @@ function renderClientSummary(mon) {
     html+=`</div></div>`;
   });
 
+  if (projects.some(p=>p.value!=null)) {
+    html+=`<div class="client-total-bar"><span>${clientMonth} — Total</span><span style="font-size:20px;font-weight:800">${fmtAUD(total)}</span></div>`;
+  }
   document.getElementById('main-content').innerHTML=html;
 }
 

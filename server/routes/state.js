@@ -36,9 +36,31 @@ export function mapTask(r) {
   };
 }
 
-// Builds the same nested shape the frontend's DATA object used, scoped by role.
+export function mapPlan(r) {
+  return {
+    id: r.id,
+    month: r.month || '',
+    projectName: r.project_name || '',
+    note: r.note || '',
+    options: Array.isArray(r.options) ? r.options : [],
+  };
+}
+
+export function mapReport(r) {
+  return {
+    id: r.id,
+    projectId: r.project_id,
+    month: r.month || '',
+    title: r.title || '',
+    results: Array.isArray(r.results) ? r.results : [],
+    showClient: r.show_client,
+  };
+}
+
+// Builds the nested shape the frontend's DATA object uses, scoped by role.
 export async function loadState(role) {
-  const includeValue = role === 'admin';
+  // Both admin and client see dollar values; team stays price-blind.
+  const includeValue = role === 'admin' || role === 'client';
 
   const projQ = await pool.query(
     `SELECT id, name, subject, product, category, month, status, value, drive_link,
@@ -50,9 +72,25 @@ export async function loadState(role) {
   const projects = projQ.rows.map((r) => mapProject(r, includeValue));
 
   let tasks = [];
-  let monthlyGoals = [];
+  let plans = [];
+  let reports = [];
   let settings = { assignees: [] };
   let slack = undefined;
+
+  // Reports & Results are visible to everyone, including the client.
+  // The client only sees reports flagged show_client AND tied to a project
+  // they can see (or with no project link).
+  const repQ = await pool.query(
+    `SELECT id, project_id, month, title, results, show_client
+       FROM reports
+      ${role === 'client' ? 'WHERE show_client = TRUE' : ''}
+      ORDER BY sort_order, id`
+  );
+  reports = repQ.rows.map(mapReport);
+  if (role === 'client') {
+    const visibleIds = new Set(projects.map((p) => p.id));
+    reports = reports.filter((r) => !r.projectId || visibleIds.has(r.projectId));
+  }
 
   if (role !== 'client') {
     const taskQ = await pool.query(
@@ -62,14 +100,10 @@ export async function loadState(role) {
     );
     tasks = taskQ.rows.map(mapTask);
 
-    const goalQ = await pool.query(
-      `SELECT id, month, category, description, target FROM goals ORDER BY month, id`
+    const planQ = await pool.query(
+      `SELECT id, month, project_name, note, options FROM plans ORDER BY sort_order, id`
     );
-    const byMonth = {};
-    for (const g of goalQ.rows) {
-      (byMonth[g.month] ||= []).push({ id: g.id, category: g.category, description: g.description, target: g.target });
-    }
-    monthlyGoals = Object.entries(byMonth).map(([month, goals]) => ({ month, goals }));
+    plans = planQ.rows.map(mapPlan);
 
     const aQ = await pool.query(`SELECT value FROM settings WHERE key = 'assignees'`);
     settings = { assignees: aQ.rows[0] ? aQ.rows[0].value : [] };
@@ -80,7 +114,7 @@ export async function loadState(role) {
     slack = sQ.rows[0] ? sQ.rows[0].value : null;
   }
 
-  return { role, settings, projects, tasks, monthlyGoals, ...(slack !== undefined ? { slack } : {}) };
+  return { role, settings, projects, tasks, plans, reports, ...(slack !== undefined ? { slack } : {}) };
 }
 
 router.get('/state', requireAuth, async (req, res, next) => {

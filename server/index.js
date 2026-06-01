@@ -10,7 +10,8 @@ import { loginHandler } from './auth.js';
 import { router as stateRouter } from './routes/state.js';
 import { router as projectsRouter } from './routes/projects.js';
 import { router as tasksRouter } from './routes/tasks.js';
-import { router as goalsRouter } from './routes/goals.js';
+import { router as plansRouter } from './routes/plans.js';
+import { router as reportsRouter } from './routes/reports.js';
 import { router as settingsRouter } from './routes/settings.js';
 import { router as slackRouter } from './slack/tick.js';
 
@@ -27,7 +28,8 @@ app.post('/api/login', loginHandler);
 app.use('/api', stateRouter);
 app.use('/api', projectsRouter);
 app.use('/api', tasksRouter);
-app.use('/api', goalsRouter);
+app.use('/api', plansRouter);
+app.use('/api', reportsRouter);
 app.use('/api', settingsRouter);
 app.use('/api', slackRouter);
 
