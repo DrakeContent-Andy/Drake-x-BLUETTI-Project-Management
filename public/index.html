@@ -564,6 +564,25 @@ function renderDashboard() {
 // ============================================================
 // PROJECTS
 // ============================================================
+// Reports/results that are linked to a given project, rendered as a block
+// beneath that project's deliverables (mirrors the Reports & Results section).
+function linkedReportsHTML(pid) {
+  const reps=DATA.reports.filter(r=>r.projectId===pid);
+  if(!reps.length) return '';
+  let h=`<div style="padding:10px 18px 14px;border-top:1px solid var(--border);background:#f0f9ff">
+    <div style="font-size:12px;font-weight:700;color:var(--blue);margin-bottom:6px">📈 Reports &amp; Results</div>`;
+  reps.forEach(r=>{
+    h+=`<div style="margin-bottom:8px">
+      <div style="font-size:13px;font-weight:600">${esc(r.title||'Report')}${r.month?` <span style="font-weight:400;color:var(--muted)">· ${esc(r.month)}</span>`:''}</div>`;
+    (r.results||[]).forEach(res=>{
+      h+=`<div style="font-size:12px;color:#334155;line-height:1.6;padding-left:10px">› ${esc(res.text||'')}${res.link?` <a href="${esc(res.link)}" target="_blank" class="drive-link" style="margin-left:4px">🔗 link</a>`:''}</div>`;
+    });
+    h+=`</div>`;
+  });
+  h+=`</div>`;
+  return h;
+}
+
 function renderProjects(fMonth, fCat) {
   if (fMonth!==undefined) projectFilterMonth=fMonth;
   if (fCat!==undefined) projectFilterCat=fCat;
@@ -580,7 +599,7 @@ function renderProjects(fMonth, fCat) {
       <option value="All" ${projectFilterCat==='All'?'selected':''}>All Categories</option>
       ${PROJECT_CATS.map(c=>`<option value="${c}" ${c===projectFilterCat?'selected':''}>${c}</option>`).join('')}
     </select>
-    <button class="btn btn-outline" onclick="exportProjectsCSV()" style="margin-left:auto">⬇ Export CSV</button>
+    <button class="btn btn-outline" onclick="exportProjectsModal()" style="margin-left:auto">⬇ Export CSV</button>
     <button class="btn btn-primary" onclick="addProjectModal()">+ New Project</button>
   </div>`;
 
@@ -628,6 +647,7 @@ function renderProjects(fMonth, fCat) {
       html+=`<div style="padding:12px 18px 14px;color:var(--muted);font-size:13px;font-style:italic">No deliverables yet — click "+ Deliverable" to add.</div>`;
     }
     if (p.note) html+=`<div style="padding:8px 18px 12px;background:var(--amber-light);font-size:12px;color:#92400e">📝 ${p.note}</div>`;
+    html+=linkedReportsHTML(p.id);
     html+=`</div>`;
   });
 
@@ -710,12 +730,33 @@ function deleteDeliverableM(pid,idx) {
   mutate(()=>API.updateProject(pid,{deliverables:dels}), ()=>{ closeModal(); renderProjects(); });
 }
 
-// Export the currently-filtered projects as a Google Sheets–friendly CSV.
+// Pick which month (and category) to export, then download a CSV.
+function exportProjectsModal() {
+  openModal(`<div class="modal-title">Export Projects to CSV</div>
+    <div class="modal-field"><label>Month</label><select id="exp-month">
+      <option value="All" ${projectFilterMonth==='All'?'selected':''}>All Months</option>
+      ${MONTHS.map(m=>`<option value="${esc(m)}" ${m===projectFilterMonth?'selected':''}>${esc(m)}</option>`).join('')}
+    </select></div>
+    <div class="modal-field"><label>Category</label><select id="exp-cat">
+      <option value="All" ${projectFilterCat==='All'?'selected':''}>All Categories</option>
+      ${PROJECT_CATS.map(c=>`<option value="${esc(c)}" ${c===projectFilterCat?'selected':''}>${esc(c)}</option>`).join('')}
+    </select></div>
+    <div class="modal-actions"><button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="doExportCSV()">⬇ Download CSV</button></div>`);
+}
+function doExportCSV() {
+  const m=document.getElementById('exp-month').value;
+  const c=document.getElementById('exp-cat').value;
+  closeModal();
+  exportProjectsCSV(m, c);
+}
+
+// Export the chosen month/category as a Google Sheets–friendly CSV.
 // Columns: Project | Link | Value. Each project is one row, followed by a
 // row per deliverable (its breakdown) beneath it.
-function exportProjectsCSV() {
+function exportProjectsCSV(fMonth, fCat) {
+  fMonth=fMonth||'All'; fCat=fCat||'All';
   const showValue = currentUser==='admin';
-  const projects=DATA.projects.filter(p=>(projectFilterMonth==='All'||p.month===projectFilterMonth)&&(projectFilterCat==='All'||p.category===projectFilterCat));
+  const projects=DATA.projects.filter(p=>(fMonth==='All'||p.month===fMonth)&&(fCat==='All'||p.category===fCat));
   if(!projects.length){ alert('No projects to export for this filter.'); return; }
   const q=(s)=>{ s=String(s==null?'':s); return /[",\n\r]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; };
   const rows=[['Project','Link',showValue?'Value (AUD)':'Value']];
@@ -729,7 +770,7 @@ function exportProjectsCSV() {
   const csv=rows.map(r=>r.map(q).join(',')).join('\r\n');
   const blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'});
   const url=URL.createObjectURL(blob);
-  const scope=projectFilterMonth==='All'?'all-months':projectFilterMonth.replace(/\s+/g,'-');
+  const scope=fMonth==='All'?'all-months':fMonth.replace(/\s+/g,'-');
   const a=document.createElement('a');
   a.href=url; a.download='bluetti-projects-'+scope.toLowerCase()+'.csv';
   document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
@@ -1054,7 +1095,7 @@ function renderClientSummary(mon) {
     } else {
       html+=`<div style="color:var(--muted);font-style:italic;font-size:13px;padding:8px 0">Deliverables to be confirmed.</div>`;
     }
-    html+=`</div></div>`;
+    html+=`</div>${linkedReportsHTML(p.id)}</div>`;
   });
 
   if (projects.some(p=>p.value!=null)) {
