@@ -272,6 +272,7 @@ let activeTaskCat = 'Shoot Plan';
 let projectFilterMonth = 'All';
 let projectFilterCat = 'All';
 let projectView = 'month'; // 'month' | 'project' — Projects section view mode
+let projectPick = 'All';   // By-Project view: which project name to show ('All' = every project)
 let planMonth = 'May 2026';
 let reportMonth = 'All';
 let clientMonth = 'April 2026';
@@ -602,6 +603,7 @@ function linkedReportsHTML(pid) {
 }
 
 function setProjectView(v) { projectView=v; renderProjects(); }
+function setProjectPick(v) { projectPick=v; renderProjects(); }
 
 function viewToggleHTML() {
   return `<div style="display:flex;gap:6px;margin-bottom:14px">
@@ -706,9 +708,18 @@ function groupProjectsByName(list) {
 function renderProjectsByProject() {
   const showValue = currentUser==='admin';
   const filtered=DATA.projects.filter(p=>projectFilterCat==='All'||p.category===projectFilterCat);
-  const groups=groupProjectsByName(filtered);
+  const allGroups=groupProjectsByName(filtered);
+
+  // Validate the current pick against what's available (category filter may have removed it).
+  const keyOf=(g)=>(g.name||'').trim().toLowerCase();
+  if (projectPick!=='All' && !allGroups.some(g=>keyOf(g)===projectPick)) projectPick='All';
+  const groups = projectPick==='All' ? allGroups : allGroups.filter(g=>keyOf(g)===projectPick);
 
   let html=viewToggleHTML()+`<div class="filter-bar">
+    <select class="filter-select" onchange="setProjectPick(this.value)">
+      <option value="All" ${projectPick==='All'?'selected':''}>All Projects</option>
+      ${allGroups.map(g=>`<option value="${esc(keyOf(g))}" ${keyOf(g)===projectPick?'selected':''}>${esc(g.name)}</option>`).join('')}
+    </select>
     <select class="filter-select" onchange="renderProjects('${projectFilterMonth}',this.value)">
       <option value="All" ${projectFilterCat==='All'?'selected':''}>All Categories</option>
       ${PROJECT_CATS.map(c=>`<option value="${c}" ${c===projectFilterCat?'selected':''}>${c}</option>`).join('')}
