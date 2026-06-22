@@ -271,6 +271,7 @@ let activeSection = null;
 let activeTaskCat = 'Shoot Plan';
 let projectFilterMonth = 'All';
 let projectFilterCat = 'All';
+let projectView = 'month'; // 'month' | 'project' — Projects section view mode
 let planMonth = 'May 2026';
 let reportMonth = 'All';
 let clientMonth = 'April 2026';
@@ -507,6 +508,22 @@ function taskCatColor(c) {
   return { 'Shoot Plan':'#2563eb','KOC':'#16a34a','KOL':'#7c3aed','PR':'#0891b2','Social Media':'#ea580c','Creative':'#d97706','General':'#64748b' }[c]||'#64748b';
 }
 function fmtAUD(n) { return 'AUD $'+Number(n).toLocaleString('en-AU',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+// Australian GST. Stored values are GST-exclusive; we compute incl-GST for display only.
+const GST_RATE = 0.10;
+// Small grey "excl. GST" caption shown under a value figure.
+const exGstNote = `<div style="font-size:10px;color:var(--muted);font-weight:400;line-height:1.2">excl. GST</div>`;
+// A 3-row Subtotal / GST / Total (incl GST) breakdown block for a given ex-GST subtotal.
+// onDark=true tunes the colours for the dark total bar (white text).
+function gstBreakdownHTML(sub, label, onDark) {
+  const gst=sub*GST_RATE, inc=sub+gst;
+  const muted = onDark ? 'rgba(255,255,255,0.75)' : 'var(--muted)';
+  const accent = onDark ? '#fff' : 'var(--green)';
+  return `<div style="display:inline-block;text-align:right;font-size:13px;line-height:1.7">
+    <div style="color:${muted}">${label?esc(label)+' — ':''}Subtotal (excl GST): <strong style="color:${accent}">${fmtAUD(sub)}</strong></div>
+    <div style="color:${muted}">GST (10%): <strong style="color:${accent}">${fmtAUD(gst)}</strong></div>
+    <div style="font-weight:800;color:${accent};font-size:15px">Total (incl GST): ${fmtAUD(inc)}</div>
+  </div>`;
+}
 function esc(s) { return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function isOverdue(d,s) { if(!d||s==='Done'||s==='Completed'||s==='Void') return false; return new Date(d)<new Date(new Date().toDateString()); }
 function driveLinkHTML(url, label) {
@@ -567,7 +584,8 @@ function renderDashboard() {
 // Reports/results that are linked to a given project, rendered as a block
 // beneath that project's deliverables (mirrors the Reports & Results section).
 function linkedReportsHTML(pid) {
-  const reps=DATA.reports.filter(r=>r.projectId===pid);
+  const ids = Array.isArray(pid) ? pid : [pid];
+  const reps=DATA.reports.filter(r=>ids.includes(r.projectId));
   if(!reps.length) return '';
   let h=`<div style="padding:10px 18px 14px;border-top:1px solid var(--border);background:#f0f9ff">
     <div style="font-size:12px;font-weight:700;color:var(--blue);margin-bottom:6px">📈 Reports &amp; Results</div>`;
@@ -583,14 +601,24 @@ function linkedReportsHTML(pid) {
   return h;
 }
 
+function setProjectView(v) { projectView=v; renderProjects(); }
+
+function viewToggleHTML() {
+  return `<div style="display:flex;gap:6px;margin-bottom:14px">
+    <button class="btn btn-sm ${projectView==='month'?'btn-primary':'btn-outline'}" onclick="setProjectView('month')">📅 By Month</button>
+    <button class="btn btn-sm ${projectView==='project'?'btn-primary':'btn-outline'}" onclick="setProjectView('project')">📦 By Project</button>
+  </div>`;
+}
+
 function renderProjects(fMonth, fCat) {
   if (fMonth!==undefined) projectFilterMonth=fMonth;
   if (fCat!==undefined) projectFilterCat=fCat;
+  if (projectView==='project') return renderProjectsByProject();
   const showValue = currentUser==='admin';
 
   const projects=DATA.projects.filter(p=>(projectFilterMonth==='All'||p.month===projectFilterMonth)&&(projectFilterCat==='All'||p.category===projectFilterCat));
 
-  let html=`<div class="filter-bar">
+  let html=viewToggleHTML()+`<div class="filter-bar">
     <select class="filter-select" onchange="renderProjects(this.value,'${projectFilterCat}')">
       <option value="All" ${projectFilterMonth==='All'?'selected':''}>All Months</option>
       ${MONTHS.map(m=>`<option value="${m}" ${m===projectFilterMonth?'selected':''}>${m}</option>`).join('')}
@@ -621,7 +649,7 @@ function renderProjects(fMonth, fCat) {
           </div>
         </div>
         <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;flex-shrink:0">
-          ${showValue?`<div style="font-size:15px;font-weight:800;color:var(--green)">${fmtAUD(p.value)}</div>`:''}
+          ${showValue?`<div style="text-align:right"><div style="font-size:15px;font-weight:800;color:var(--green)">${fmtAUD(p.value)}</div>${exGstNote}</div>`:''}
           <div style="display:flex;gap:6px">
             <button class="btn btn-sm btn-outline" onclick="addDeliverableModal(${p.id})">+ Deliverable</button>
             <button class="btn btn-sm btn-ghost" onclick="editProjectModal(${p.id})">✎</button>
@@ -653,7 +681,108 @@ function renderProjects(fMonth, fCat) {
 
   if (showValue&&projects.length>1) {
     const total=projects.reduce((s,p)=>s+Number(p.value||0),0);
-    html+=`<div style="text-align:right;padding:8px 4px;font-size:14px;font-weight:700;color:var(--green)">Total: ${fmtAUD(total)}</div>`;
+    html+=`<div style="text-align:right;padding:10px 4px">${gstBreakdownHTML(total)}</div>`;
+  }
+  document.getElementById('main-content').innerHTML=html;
+}
+
+// Bucket project records that share the same name (case-insensitive, trimmed)
+// into one group, members sorted by month order. Used by the By-Project view.
+function groupProjectsByName(list) {
+  const groups={};
+  list.forEach(p=>{
+    const key=(p.name||'').trim().toLowerCase();
+    if(!groups[key]) groups[key]={name:p.name, items:[]};
+    groups[key].items.push(p);
+  });
+  const order=(m)=>{ const i=MONTHS.indexOf(m); return i<0?999:i; };
+  return Object.values(groups).map(g=>{
+    g.items.sort((a,b)=>order(a.month)-order(b.month));
+    return g;
+  });
+}
+
+// "By Project" view: one combined card per project name, spanning all months.
+function renderProjectsByProject() {
+  const showValue = currentUser==='admin';
+  const filtered=DATA.projects.filter(p=>projectFilterCat==='All'||p.category===projectFilterCat);
+  const groups=groupProjectsByName(filtered);
+
+  let html=viewToggleHTML()+`<div class="filter-bar">
+    <select class="filter-select" onchange="renderProjects('${projectFilterMonth}',this.value)">
+      <option value="All" ${projectFilterCat==='All'?'selected':''}>All Categories</option>
+      ${PROJECT_CATS.map(c=>`<option value="${c}" ${c===projectFilterCat?'selected':''}>${c}</option>`).join('')}
+    </select>
+    <button class="btn btn-outline" onclick="exportProjectsModal()" style="margin-left:auto">⬇ Export CSV</button>
+    <button class="btn btn-primary" onclick="addProjectModal()">+ New Project</button>
+  </div>`;
+
+  if (!groups.length) { html+=`<div class="empty-state"><div class="empty-icon">📦</div><p>No projects match this filter.</p></div>`; document.getElementById('main-content').innerHTML=html; return; }
+
+  let grand=0;
+  groups.forEach(g=>{
+    const ids=g.items.map(p=>p.id);
+    const groupTotal=g.items.reduce((s,p)=>s+Number(p.value||0),0);
+    grand+=groupTotal;
+    const months=g.items.map(p=>p.month).filter(Boolean);
+    const cat=g.items[0].category;
+
+    html+=`<div class="project-card">
+      <div class="project-card-header">
+        <div style="flex:1;min-width:0">
+          <div class="project-card-title">${esc(g.name)}</div>
+          <div class="project-card-meta" style="margin-top:6px">
+            ${catBadge(cat)}
+            <span style="font-size:12px;color:var(--muted)">${months.length} month${months.length!==1?'s':''}: ${months.map(esc).join(' · ')}</span>
+          </div>
+        </div>
+        ${showValue?`<div style="text-align:right;flex-shrink:0"><div style="font-size:15px;font-weight:800;color:var(--green)">${fmtAUD(groupTotal)}</div>${exGstNote}</div>`:''}
+      </div>`;
+
+    // Per-month value breakdown line
+    if (showValue) {
+      html+=`<div style="padding:6px 18px;font-size:12px;color:var(--muted)">${g.items.map(p=>`${esc(p.month||'—')}: <strong style="color:var(--green)">${fmtAUD(p.value)}</strong>`).join(' &nbsp;·&nbsp; ')}</div>`;
+    }
+
+    // Deliverables grouped by month, each row keeping its real per-record edit/delete
+    g.items.forEach(p=>{
+      html+=`<div style="padding:8px 18px 2px;display:flex;align-items:center;justify-content:space-between">
+        <div style="font-size:12px;font-weight:700;color:var(--blue)">📅 ${esc(p.month||'—')} ${statusBadge(p.status)}${p.driveLink?` <a href="${p.driveLink}" target="_blank" class="drive-link">📁 Files</a>`:''}</div>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-sm btn-outline" onclick="addDeliverableModal(${p.id})">+ Deliverable</button>
+          <button class="btn btn-sm btn-ghost" onclick="editProjectModal(${p.id})">✎</button>
+          <button class="btn btn-sm btn-ghost" onclick="deleteProject(${p.id})" style="color:var(--red)">✕</button>
+        </div>
+      </div>`;
+      if (p.deliverables&&p.deliverables.length) {
+        html+=`<div class="deliverable-list">`;
+        p.deliverables.forEach((d,idx)=>{
+          html+=`<div class="deliverable-item">
+            <div class="deliverable-dot"></div>
+            <div class="deliverable-text">${d.text}${d.driveLink?` <a href="${d.driveLink}" target="_blank" class="drive-link" style="margin-left:6px">📁 Files</a>`:''}</div>
+            <div class="deliverable-actions">
+              <button class="btn btn-sm btn-ghost" onclick="editDeliverableModal(${p.id},${idx})">✎</button>
+              <button class="btn btn-sm btn-ghost" onclick="deleteDeliverable(${p.id},${idx})" style="color:var(--red)">✕</button>
+            </div>
+          </div>`;
+        });
+        html+=`</div>`;
+      } else {
+        html+=`<div style="padding:4px 18px 10px;color:var(--muted);font-size:12px;font-style:italic">No deliverables for ${esc(p.month||'this month')} yet.</div>`;
+      }
+      if (p.note) html+=`<div style="padding:6px 18px 10px;background:var(--amber-light);font-size:12px;color:#92400e">📝 ${p.note}</div>`;
+    });
+
+    // Combined GST breakdown for the whole project
+    if (showValue) html+=`<div style="padding:10px 18px;border-top:1px solid var(--border);text-align:right">${gstBreakdownHTML(groupTotal)}</div>`;
+
+    // All reports across every month-record in this group
+    html+=linkedReportsHTML(ids);
+    html+=`</div>`;
+  });
+
+  if (showValue&&groups.length>1) {
+    html+=`<div style="text-align:right;padding:10px 4px">${gstBreakdownHTML(grand,'All projects')}</div>`;
   }
   document.getElementById('main-content').innerHTML=html;
 }
@@ -759,14 +888,18 @@ function exportProjectsCSV(fMonth, fCat) {
   const projects=DATA.projects.filter(p=>(fMonth==='All'||p.month===fMonth)&&(fCat==='All'||p.category===fCat));
   if(!projects.length){ alert('No projects to export for this filter.'); return; }
   const q=(s)=>{ s=String(s==null?'':s); return /[",\n\r]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; };
-  const rows=[['Project','Link',showValue?'Value (AUD)':'Value']];
+  const rows=[['Project','Link',showValue?'Value (AUD, excl GST)':'Value']];
   let grand=0;
   projects.forEach(p=>{
     if(showValue) grand+=Number(p.value||0);
     rows.push([p.name, p.driveLink||'', showValue?Number(p.value||0).toFixed(2):'']);
     (p.deliverables||[]).forEach(d=>{ rows.push(['   • '+(d.text||''), d.driveLink||'', '']); });
   });
-  if(showValue) rows.push(['TOTAL','',grand.toFixed(2)]);
+  if(showValue) {
+    rows.push(['TOTAL (excl GST)','',grand.toFixed(2)]);
+    rows.push(['GST (10%)','',(grand*GST_RATE).toFixed(2)]);
+    rows.push(['TOTAL (incl GST)','',(grand*(1+GST_RATE)).toFixed(2)]);
+  }
   const csv=rows.map(r=>r.map(q).join(',')).join('\r\n');
   const blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'});
   const url=URL.createObjectURL(blob);
@@ -1053,17 +1186,18 @@ function renderSummaries(mon) {
     html+=`<div class="card" style="margin-bottom:14px">
       <div class="card-header">
         <div><div style="font-weight:700;font-size:15px">${p.name}</div><div style="margin-top:4px;display:flex;gap:8px">${catBadge(p.category)} ${statusBadge(p.status)}</div></div>
-        <div style="font-size:18px;font-weight:800;color:var(--green)">${fmtAUD(p.value)}</div>
+        <div style="text-align:right"><div style="font-size:18px;font-weight:800;color:var(--green)">${fmtAUD(p.value)}</div>${exGstNote}</div>
       </div>`;
     if (p.deliverables&&p.deliverables.length) {
       html+=`<div style="padding:4px 20px 12px">`;
       p.deliverables.forEach(d=>{ html+=`<div style="display:flex;align-items:flex-start;gap:8px;padding:5px 0;border-bottom:1px solid var(--light)"><div style="color:var(--blue);font-size:14px;flex-shrink:0;margin-top:1px">›</div><div style="font-size:13px;flex:1">${d.text}${d.driveLink?` <a href="${d.driveLink}" target="_blank" class="drive-link" style="margin-left:6px">📁</a>`:''}</div></div>`; });
       html+=`</div>`;
     }
+    html+=linkedReportsHTML(p.id);
     html+=`</div>`;
   });
 
-  html+=`<div class="client-total-bar"><span>${summaryMonth} — Total</span><span style="font-size:20px;font-weight:800">${fmtAUD(total)}</span></div>`;
+  html+=`<div class="client-total-bar" style="display:block;text-align:right">${gstBreakdownHTML(total, summaryMonth, true)}</div>`;
   document.getElementById('main-content').innerHTML=html;
 }
 
@@ -1087,7 +1221,7 @@ function renderClientSummary(mon) {
           <div class="client-project-name">${p.name}</div>
           <div style="margin-top:5px;display:flex;gap:8px;flex-wrap:wrap">${catBadge(p.category)} ${statusBadge(p.status)}${p.driveLink?` <a href="${p.driveLink}" target="_blank" class="drive-link">📁 Project Files</a>`:''}</div>
         </div>
-        ${p.value!=null?`<div style="font-size:15px;font-weight:800;color:var(--green);white-space:nowrap">${fmtAUD(p.value)}</div>`:''}
+        ${p.value!=null?`<div style="text-align:right;white-space:nowrap"><div style="font-size:15px;font-weight:800;color:var(--green)">${fmtAUD(p.value)}</div>${exGstNote}</div>`:''}
       </div>
       <div class="client-deliverables">`;
     if (p.deliverables&&p.deliverables.length) {
@@ -1099,7 +1233,7 @@ function renderClientSummary(mon) {
   });
 
   if (projects.some(p=>p.value!=null)) {
-    html+=`<div class="client-total-bar"><span>${clientMonth} — Total</span><span style="font-size:20px;font-weight:800">${fmtAUD(total)}</span></div>`;
+    html+=`<div class="client-total-bar" style="display:block;text-align:right">${gstBreakdownHTML(total, clientMonth, true)}</div>`;
   }
   document.getElementById('main-content').innerHTML=html;
 }
