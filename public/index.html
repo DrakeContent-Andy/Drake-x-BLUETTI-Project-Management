@@ -186,6 +186,9 @@ tr:hover td{background:#fafafa}
 .slack-note{font-size:12px;color:var(--muted);margin-top:4px}
 .plan-option{border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px;background:var(--light)}
 .plan-option-rec{border-color:var(--green);background:#f0fdf4}
+.task-board{display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start}
+.task-card{border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:10px;background:#fff}
+.task-card-overdue{border-color:var(--red);background:#fef2f2}
 </style>
 </head>
 <body>
@@ -268,7 +271,7 @@ let DATA = {
 // ============================================================
 let currentUser = null;   // 'admin' | 'team' | 'client'
 let activeSection = null;
-let activeTaskCat = 'Shoot Plan';
+let taskProject = 'All'; // Tasks board: which project to show ('All' | 'none' | project id)
 let projectFilterMonth = 'All';
 let projectFilterCat = 'All';
 let projectView = 'month'; // 'month' | 'project' — Projects section view mode
@@ -306,6 +309,8 @@ const API = {
   createTask(b)        { return API.req('POST', '/tasks', b); },
   updateTask(id, b)    { return API.req('PATCH', '/tasks/' + id, b); },
   deleteTask(id)       { return API.req('DELETE', '/tasks/' + id); },
+  addTaskLog(id, action){ return API.req('POST', '/tasks/' + id + '/log', { action }); },
+  deleteTaskLog(id, ix){ return API.req('DELETE', '/tasks/' + id + '/log/' + ix); },
   createPlan(b)        { return API.req('POST', '/plans', b); },
   updatePlan(id, b)    { return API.req('PATCH', '/plans/' + id, b); },
   deletePlan(id)       { return API.req('DELETE', '/plans/' + id); },
@@ -462,6 +467,7 @@ function buildNav() {
   if (currentUser==='client') {
     nav.innerHTML = `<div class="nav-section">Client Portal</div>
       <div class="nav-item" data-sec="client-summary" onclick="showSection('client-summary')"><span class="nav-icon">📋</span>Monthly Summary</div>
+      <div class="nav-item" data-sec="tasks" onclick="showSection('tasks')"><span class="nav-icon">📋</span>Progress</div>
       <div class="nav-item" data-sec="reports" onclick="showSection('reports')"><span class="nav-icon">📈</span>Reports & Results</div>`;
     return;
   }
@@ -556,8 +562,8 @@ function renderDashboard() {
   </div>`;
 
   if (dueThisWeek.length) {
-    html+=`<div class="card"><div class="card-header"><div class="card-title">⚡ Due This Week</div></div><div class="table-wrap"><table><thead><tr><th>Task</th><th>Category</th><th>Assignee</th><th>Due</th><th>Status</th></tr></thead><tbody>`;
-    dueThisWeek.forEach(t=>{ const od=isOverdue(t.dueDate,t.status); html+=`<tr class="${t.status==='Done'?'task-row-done':''}"><td style="font-weight:600;${od?'color:var(--red)':''}">${t.task}${od?' ⚠':''}</td><td><span style="color:${taskCatColor(t.category)};font-weight:600;font-size:12px">${t.category}</span></td><td>${t.assignee}</td><td style="${od?'color:var(--red);font-weight:700':''};font-size:12px">${t.dueDate}</td><td>${statusBadge(t.status)}</td></tr>`; });
+    html+=`<div class="card"><div class="card-header"><div class="card-title">⚡ Due This Week</div></div><div class="table-wrap"><table><thead><tr><th>Task</th><th>Project</th><th>Assignee</th><th>Due</th><th>Status</th></tr></thead><tbody>`;
+    dueThisWeek.forEach(t=>{ const od=isOverdue(t.dueDate,t.status); const proj=t.projectId?DATA.projects.find(p=>p.id===t.projectId):null; html+=`<tr class="${t.status==='Done'?'task-row-done':''}" style="cursor:pointer" onclick="taskLogModal(${t.id})"><td style="font-weight:600;${od?'color:var(--red)':''}">${esc(t.task)}${od?' ⚠':''}</td><td style="font-size:12px;color:var(--blue)">${proj?esc(proj.name):'<span style="color:var(--muted)">—</span>'}</td><td>${esc(t.assignee)}</td><td style="${od?'color:var(--red);font-weight:700':''};font-size:12px">${t.dueDate}</td><td>${statusBadge(t.status)}</td></tr>`; });
     html+=`</tbody></table></div></div>`;
   }
 
@@ -677,6 +683,7 @@ function renderProjects(fMonth, fCat) {
       html+=`<div style="padding:12px 18px 14px;color:var(--muted);font-size:13px;font-style:italic">No deliverables yet — click "+ Deliverable" to add.</div>`;
     }
     if (p.note) html+=`<div style="padding:8px 18px 12px;background:var(--amber-light);font-size:12px;color:#92400e">📝 ${p.note}</div>`;
+    html+=taskBoardHTML(p.id);
     html+=linkedReportsHTML(p.id);
     html+=`</div>`;
   });
@@ -787,7 +794,8 @@ function renderProjectsByProject() {
     // Combined GST breakdown for the whole project
     if (showValue) html+=`<div style="padding:10px 18px;border-top:1px solid var(--border);text-align:right">${gstBreakdownHTML(groupTotal)}</div>`;
 
-    // All reports across every month-record in this group
+    // Progress board + all reports across every month-record in this group
+    html+=taskBoardHTML(ids);
     html+=linkedReportsHTML(ids);
     html+=`</div>`;
   });
@@ -923,91 +931,207 @@ function exportProjectsCSV(fMonth, fCat) {
 // ============================================================
 // TASKS
 // ============================================================
-function renderTasks(cat) {
-  if (cat) activeTaskCat=cat;
-  const tasks=DATA.tasks.filter(t=>t.category===activeTaskCat);
-  const sorted=[...tasks].sort((a,b)=>{ const ao=isOverdue(a.dueDate,a.status)?0:1,bo=isOverdue(b.dueDate,b.status)?0:1; return ao!==bo?ao-bo:(a.dueDate||'').localeCompare(b.dueDate||''); });
-
-  let html=`<div class="tabs">${TASK_CATS.map(c=>`<div class="tab ${c===activeTaskCat?'active':''}" onclick="renderTasks('${c}')">${c}</div>`).join('')}</div>
-    <div class="section-header">
-      <div style="display:flex;align-items:center;gap:12px">
-        <span style="font-size:13px;color:var(--muted)">${tasks.length} task${tasks.length!==1?'s':''} · ${activeTaskCat}</span>
-        <button class="btn btn-sm btn-ghost" onclick="manageAssigneesModal()" style="font-size:11px">⚙ Manage Assignees</button>
-      </div>
-      <button class="btn btn-primary" onclick="addTaskModal('${activeTaskCat}')">+ New Task</button>
-    </div>`;
-
-  if (!tasks.length) { html+=`<div class="empty-state"><div class="empty-icon">✅</div><p>No ${activeTaskCat} tasks yet.</p></div>`; document.getElementById('main-content').innerHTML=html; return; }
-
-  html+=`<div class="card"><div class="table-wrap"><table><thead><tr><th>Task</th><th>Linked Project</th><th>Assignee</th><th>Due</th><th>Priority</th><th>Status</th><th></th></tr></thead><tbody>`;
-  sorted.forEach(t=>{
-    const od=isOverdue(t.dueDate,t.status);
-    const proj=t.projectId?DATA.projects.find(p=>p.id===t.projectId):null;
-    html+=`<tr class="${t.status==='Done'?'task-row-done':''}">
-      <td><div style="font-weight:600;${od?'color:var(--red)':''}">${t.task}${od?' ⚠':''}</div>
-        ${t.driveLink?`<div style="margin-top:4px"><a href="${t.driveLink}" target="_blank" class="drive-link">📁 Files</a></div>`:''}
-        ${t.note?`<div style="font-size:11px;color:var(--muted);margin-top:2px">${t.note.substring(0,80)}${t.note.length>80?'…':''}</div>`:''}</td>
-      <td style="font-size:12px;color:var(--blue)">${proj?proj.name:'<span style="color:var(--muted)">—</span>'}</td>
-      <td style="font-weight:500">${t.assignee}</td>
-      <td style="${od?'color:var(--red);font-weight:700':''};font-size:12px">${t.dueDate||'—'}</td>
-      <td><span class="priority-${(t.priority||'').toLowerCase()}" style="font-size:12px;font-weight:700">● ${t.priority}</span></td>
-      <td>${statusBadge(t.status)}</td>
-      <td style="white-space:nowrap">
-        ${t.status!=='Done'?`<button class="btn btn-sm btn-ghost" onclick="quickDone(${t.id})" title="Mark done" style="color:var(--green)">✓</button>`:''}
-        <button class="btn btn-sm btn-ghost" onclick="editTaskModal(${t.id})">✎</button>
-        <button class="btn btn-sm btn-ghost" onclick="deleteTask(${t.id})" style="color:var(--red)">✕</button>
-      </td>
-    </tr>`;
+const PRIO_ORDER = { High:0, Medium:1, Low:2 };
+function sortTasks(list) {
+  return [...list].sort((a,b)=>{
+    const oa=isOverdue(a.dueDate,a.status)?0:1, ob=isOverdue(b.dueDate,b.status)?0:1;
+    if(oa!==ob) return oa-ob;
+    const pa=PRIO_ORDER[a.priority]??1, pb=PRIO_ORDER[b.priority]??1;
+    if(pa!==pb) return pa-pb;
+    return (a.dueDate||'').localeCompare(b.dueDate||'');
   });
-  html+=`</tbody></table></div></div>`;
+}
+function taskTimeline(t) {
+  if(t.startDate&&t.dueDate) return esc(t.startDate)+' → '+esc(t.dueDate);
+  if(t.dueDate) return 'Due '+esc(t.dueDate);
+  if(t.startDate) return 'From '+esc(t.startDate);
+  return '';
+}
+function fmtTs(iso) { if(!iso) return ''; try { return new Date(iso).toLocaleString('en-AU',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}); } catch(e) { return iso; } }
+
+// A single task card (used in the Tasks hub board). opts: {readonly, showProject}
+function taskCardHTML(t, opts) {
+  opts=opts||{};
+  const ro=opts.readonly || currentUser==='client';
+  const od=isOverdue(t.dueDate,t.status);
+  const proj=t.projectId?DATA.projects.find(p=>p.id===t.projectId):null;
+  const tl=taskTimeline(t);
+  const logN=(t.log||[]).length;
+  let btns='';
+  if(!ro){
+    if(t.status==='To Do') btns+=`<button class="btn btn-sm btn-outline" onclick="moveTask(${t.id},'In Progress')" title="Start">▶ Start</button>`;
+    else if(t.status==='In Progress') btns+=`<button class="btn btn-sm btn-ghost" onclick="moveTask(${t.id},'To Do')" title="Back to To Do">◀</button>`;
+    if(t.status!=='Done'&&t.projectId) btns+=`<button class="btn btn-sm btn-outline" style="color:var(--green);border-color:var(--green)" onclick="promoteTask(${t.id})" title="Mark done and add to deliverables">✓ Done</button>`;
+    else if(t.status!=='Done') btns+=`<button class="btn btn-sm btn-ghost" style="color:var(--green)" onclick="moveTask(${t.id},'Done')" title="Mark done">✓</button>`;
+  }
+  return `<div class="task-card${od?' task-card-overdue':''}">
+    <div style="cursor:pointer" onclick="taskLogModal(${t.id})">
+      <div style="font-weight:600;font-size:13px;${od?'color:var(--red)':''}">${esc(t.task)}${od?' ⚠':''}</div>
+      ${opts.showProject&&proj?`<div style="font-size:11px;color:var(--blue);margin-top:2px">📁 ${esc(proj.name)}</div>`:''}
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;font-size:11px;color:var(--muted)">
+        <span class="priority-${(t.priority||'').toLowerCase()}" style="font-weight:700">● ${esc(t.priority||'')}</span>
+        ${t.assignee?`<span>👤 ${esc(t.assignee)}</span>`:''}
+        ${tl?`<span style="${od?'color:var(--red);font-weight:700':''}">🗓 ${tl}</span>`:''}
+      </div>
+    </div>
+    ${t.nextSteps?`<div style="font-size:11px;color:#334155;margin-top:6px;background:var(--light);border-radius:6px;padding:5px 8px"><b>Next:</b> ${esc(t.nextSteps)}</div>`:''}
+    <div style="display:flex;gap:5px;align-items:center;margin-top:8px;flex-wrap:wrap">
+      <button class="btn btn-sm btn-ghost" onclick="taskLogModal(${t.id})" style="font-size:11px">🗒 Log${logN?' ('+logN+')':''}</button>
+      ${t.driveLink?`<a href="${esc(t.driveLink)}" target="_blank" class="drive-link" style="font-size:11px">📁 Files</a>`:''}
+      <span style="margin-left:auto;display:flex;gap:4px">${btns}${!ro?`<button class="btn btn-sm btn-ghost" onclick="editTaskModal(${t.id})">✎</button><button class="btn btn-sm btn-ghost" style="color:var(--red)" onclick="deleteTask(${t.id})">✕</button>`:''}</span>
+    </div>
+  </div>`;
+}
+
+function taskColumnsHTML(tasks, opts) {
+  const todo=sortTasks(tasks.filter(t=>t.status==='To Do'));
+  const prog=sortTasks(tasks.filter(t=>t.status==='In Progress'));
+  const col=(title,color,items)=>`<div style="flex:1;min-width:240px">
+    <div style="font-weight:800;font-size:13px;color:${color};margin-bottom:8px">${title} <span style="color:var(--muted);font-weight:600">(${items.length})</span></div>
+    ${items.length?items.map(t=>taskCardHTML(t,opts)).join(''):`<div style="color:var(--muted);font-size:12px;font-style:italic;padding:10px 0">Nothing here yet.</div>`}
+  </div>`;
+  return `<div class="task-board">${col('🟡 To Do','#b45309',todo)}${col('🔵 In Progress','#1d4ed8',prog)}</div>`;
+}
+
+function renderTasks(pid) {
+  if (pid!==undefined) taskProject=pid;
+  const canEdit=currentUser!=='client';
+
+  let scoped, scopeLabel, prePid='null';
+  if (taskProject==='none') { scoped=DATA.tasks.filter(t=>!t.projectId); scopeLabel='Unassigned'; }
+  else if (taskProject!=='All') { const idn=parseInt(taskProject,10); scoped=DATA.tasks.filter(t=>t.projectId===idn); const p=DATA.projects.find(x=>x.id===idn); scopeLabel=p?p.name:'Project'; prePid=idn; }
+  else { scoped=DATA.tasks; scopeLabel='All projects'; }
+  const showProject = (taskProject==='All'||taskProject==='none');
+
+  const projOpts=DATA.projects.map(p=>`<option value="${p.id}" ${String(taskProject)===String(p.id)?'selected':''}>${esc(p.name)} (${esc(p.month)})</option>`).join('');
+  let html=`<div class="filter-bar">
+    <select class="filter-select" onchange="renderTasks(this.value)">
+      <option value="All" ${taskProject==='All'?'selected':''}>All Projects</option>
+      <option value="none" ${taskProject==='none'?'selected':''}>Unassigned</option>
+      ${projOpts}
+    </select>
+    ${canEdit?`<button class="btn btn-sm btn-ghost" onclick="manageAssigneesModal()" style="font-size:11px">⚙ Assignees</button>`:''}
+    ${canEdit?`<button class="btn btn-primary" onclick="addTaskModal(${prePid})" style="margin-left:auto">+ New Task</button>`:''}
+  </div>
+  <div style="font-size:13px;color:var(--muted);margin-bottom:14px">Plan work in <b>To Do</b>, move it to <b>In Progress</b> when you start, then <b>✓ Done</b> promotes it to the project's deliverables. Click any task to open its activity log.</div>`;
+
+  html+=taskColumnsHTML(scoped,{readonly:!canEdit,showProject});
+
+  const done=sortTasks(scoped.filter(t=>t.status==='Done'));
+  if(done.length) html+=`<details style="margin-top:16px"><summary style="cursor:pointer;font-weight:700;font-size:13px;color:var(--green)">✓ Delivered / Done (${done.length})</summary><div style="margin-top:10px">${done.map(t=>taskCardHTML(t,{readonly:!canEdit,showProject})).join('')}</div></details>`;
+  const parked=scoped.filter(t=>t.status==='On Hold'||t.status==='Void');
+  if(parked.length) html+=`<details style="margin-top:12px"><summary style="cursor:pointer;font-weight:700;font-size:13px;color:var(--muted)">⏸ On Hold / Parked (${parked.length})</summary><div style="margin-top:10px">${parked.map(t=>taskCardHTML(t,{readonly:!canEdit,showProject})).join('')}</div></details>`;
+
   document.getElementById('main-content').innerHTML=html;
 }
 
-function taskFormHTML(t, defaultCat) {
-  const cat=t?t.category:(defaultCat||'General');
-  const assignees=getAssignees();
-  return `
-    <div class="modal-field"><label>Task</label><input type="text" id="tk-task" value="${(t&&t.task||'').replace(/"/g,'&quot;')}" placeholder="Describe the task..."></div>
-    <div class="field-row">
-      <div class="modal-field"><label>Category</label><select id="tk-cat">${TASK_CATS.map(c=>`<option value="${c}" ${c===cat?'selected':''}>${c}</option>`).join('')}</select></div>
-      <div class="modal-field"><label>Assignee</label><select id="tk-assign">${assignees.map(a=>`<option value="${a}" ${t&&t.assignee===a?'selected':''}>${a}</option>`).join('')}</select></div>
+// Compact progress board shown under a project card. pid = id or array of ids.
+function taskBoardHTML(pid, opts) {
+  opts=opts||{};
+  const ids=Array.isArray(pid)?pid:[pid];
+  const list=DATA.tasks.filter(t=>ids.includes(t.projectId));
+  const canEdit=!opts.readonly && currentUser!=='client';
+  const todo=sortTasks(list.filter(t=>t.status==='To Do'));
+  const prog=sortTasks(list.filter(t=>t.status==='In Progress'));
+  if(!todo.length && !prog.length && !canEdit) return '';
+  const row=(t)=>`<div style="display:flex;align-items:center;gap:6px;padding:3px 0">
+      <span style="flex:1;min-width:0;font-size:12px;cursor:pointer" onclick="taskLogModal(${t.id})">${esc(t.task)}${(t.log||[]).length?` <span style="color:var(--muted)">🗒${(t.log||[]).length}</span>`:''}</span>
+      ${canEdit&&t.status==='To Do'?`<button class="btn btn-sm btn-ghost" title="Start" onclick="moveTask(${t.id},'In Progress')">▶</button>`:''}
+      ${canEdit&&t.status!=='Done'?`<button class="btn btn-sm btn-ghost" style="color:var(--green)" title="Done → deliverable" onclick="promoteTask(${t.id})">✓</button>`:''}
+    </div>`;
+  const addBtn = (canEdit&&ids.length===1)?` <button class="btn btn-sm btn-ghost" style="font-size:11px" onclick="addTaskModal(${ids[0]})">+ Task</button>`:'';
+  return `<div style="padding:10px 18px 14px;border-top:1px solid var(--border);background:#fffbeb">
+    <div style="font-size:12px;font-weight:700;color:#b45309;margin-bottom:6px">📋 Progress${addBtn}</div>
+    <div style="display:flex;gap:16px;flex-wrap:wrap">
+      <div style="flex:1;min-width:180px"><div style="font-size:11px;font-weight:700;color:#b45309;margin-bottom:2px">🟡 To Do (${todo.length})</div>${todo.length?todo.map(row).join(''):'<div style="font-size:11px;color:var(--muted);font-style:italic">—</div>'}</div>
+      <div style="flex:1;min-width:180px"><div style="font-size:11px;font-weight:700;color:#1d4ed8;margin-bottom:2px">🔵 In Progress (${prog.length})</div>${prog.length?prog.map(row).join(''):'<div style="font-size:11px;color:var(--muted);font-style:italic">—</div>'}</div>
     </div>
-    <div class="field-row">
-      <div class="modal-field"><label>Due Date</label><input type="date" id="tk-due" value="${t&&t.dueDate||''}"></div>
-      <div class="modal-field"><label>Priority</label><select id="tk-prio"><option value="High" ${!t||t.priority==='High'?'selected':''}>High</option><option value="Medium" ${t&&t.priority==='Medium'?'selected':''}>Medium</option><option value="Low" ${t&&t.priority==='Low'?'selected':''}>Low</option></select></div>
-    </div>
-    <div class="modal-field"><label>Status</label><select id="tk-status">${['To Do','In Progress','Done','On Hold','Void'].map(s=>`<option value="${s}" ${t&&t.status===s?'selected':''}>${s}</option>`).join('')}</select></div>
-    <div class="modal-field"><label>Linked Project <span style="font-weight:400;color:var(--muted)">(optional)</span></label><select id="tk-proj"><option value="">— none —</option>${DATA.projects.map(p=>`<option value="${p.id}" ${t&&t.projectId===p.id?'selected':''}>${p.name} (${p.month})</option>`).join('')}</select></div>
-    <div class="modal-field"><label>Google Drive Link <span style="font-weight:400;color:var(--muted)">(optional — assets folder or reference)</span></label><input type="url" id="tk-drive" value="${t&&t.driveLink||''}" placeholder="https://drive.google.com/..."></div>
-    <div class="modal-field"><label>${cat==='Shoot Plan'?'Shoot Brief / Notes':'Note'}</label><textarea id="tk-note" rows="${cat==='Shoot Plan'?5:3}" placeholder="${cat==='Shoot Plan'?'Location, crew, subject, brief, requirements...':'Any context or notes...'}">${t&&t.note||''}</textarea></div>`;
+  </div>`;
 }
 
-function addTaskModal(cat) { openModal(`<div class="modal-title">New Task — ${cat}</div>${taskFormHTML(null,cat)}<div class="modal-actions"><button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveNewTask()">Create Task</button></div>`); }
-function saveNewTask() {
-  const task=document.getElementById('tk-task').value.trim(); if(!task) return;
+function taskFormHTML(t, prePid) {
+  const assignees=getAssignees();
+  const selPid = t?t.projectId:(typeof prePid==='number'?prePid:null);
+  return `
+    <div class="modal-field"><label>Task</label><input type="text" id="tk-task" value="${esc(t&&t.task||'')}" placeholder="Describe the task..."></div>
+    <div class="modal-field"><label>Linked Project</label><select id="tk-proj"><option value="">— none (unassigned) —</option>${DATA.projects.map(p=>`<option value="${p.id}" ${selPid===p.id?'selected':''}>${esc(p.name)} (${esc(p.month)})</option>`).join('')}</select></div>
+    <div class="field-row">
+      <div class="modal-field"><label>Assignee</label><select id="tk-assign"><option value="">—</option>${assignees.map(a=>`<option value="${esc(a)}" ${t&&t.assignee===a?'selected':''}>${esc(a)}</option>`).join('')}</select></div>
+      <div class="modal-field"><label>Priority</label><select id="tk-prio"><option value="High" ${!t||t.priority==='High'?'selected':''}>High</option><option value="Medium" ${t&&t.priority==='Medium'?'selected':''}>Medium</option><option value="Low" ${t&&t.priority==='Low'?'selected':''}>Low</option></select></div>
+    </div>
+    <div class="field-row">
+      <div class="modal-field"><label>Start Date <span style="font-weight:400;color:var(--muted)">(expected)</span></label><input type="date" id="tk-start" value="${t&&t.startDate||''}"></div>
+      <div class="modal-field"><label>Due Date</label><input type="date" id="tk-due" value="${t&&t.dueDate||''}"></div>
+    </div>
+    <div class="modal-field"><label>Status</label><select id="tk-status">${['To Do','In Progress','Done','On Hold','Void'].map(s=>`<option value="${s}" ${(t?t.status:'To Do')===s?'selected':''}>${s}</option>`).join('')}</select></div>
+    <div class="modal-field"><label>Next Steps <span style="font-weight:400;color:var(--muted)">(what's pending — visible to client)</span></label><textarea id="tk-next" rows="2" placeholder="What happens next…">${esc(t&&t.nextSteps||'')}</textarea></div>
+    <div class="modal-field"><label>Google Drive Link <span style="font-weight:400;color:var(--muted)">(optional)</span></label><input type="url" id="tk-drive" value="${esc(t&&t.driveLink||'')}" placeholder="https://drive.google.com/..."></div>
+    <div class="modal-field"><label>Internal Note <span style="font-weight:400;color:var(--muted)">(Drake only — not shown to client)</span></label><textarea id="tk-note" rows="3" placeholder="Any internal context…">${esc(t&&t.note||'')}</textarea></div>`;
+}
+
+function addTaskModal(prePid) { openModal(`<div class="modal-title">New Task</div>${taskFormHTML(null, typeof prePid==='number'?prePid:null)}<div class="modal-actions"><button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveNewTask()">Create Task</button></div>`); }
+function taskFormBody() {
   const pv=document.getElementById('tk-proj').value;
-  const newCat=document.getElementById('tk-cat').value;
-  const body={ category:newCat, task, assignee:document.getElementById('tk-assign').value, dueDate:document.getElementById('tk-due').value, priority:document.getElementById('tk-prio').value, status:document.getElementById('tk-status').value, projectId:pv?parseInt(pv):null, driveLink:document.getElementById('tk-drive').value, note:document.getElementById('tk-note').value };
-  mutate(()=>API.createTask(body), ()=>{ closeModal(); renderTasks(newCat); });
+  return {
+    task:document.getElementById('tk-task').value.trim(),
+    projectId:pv?parseInt(pv,10):null,
+    assignee:document.getElementById('tk-assign').value,
+    startDate:document.getElementById('tk-start').value,
+    dueDate:document.getElementById('tk-due').value,
+    priority:document.getElementById('tk-prio').value,
+    status:document.getElementById('tk-status').value,
+    nextSteps:document.getElementById('tk-next').value,
+    driveLink:document.getElementById('tk-drive').value,
+    note:document.getElementById('tk-note').value,
+  };
+}
+function saveNewTask() {
+  const body=taskFormBody(); if(!body.task){ alert('Enter a task.'); return; }
+  mutate(()=>API.createTask(body), ()=>{ closeModal(); rerender(); });
 }
 function editTaskModal(id) {
-  const t=DATA.tasks.find(x=>x.id===id);
-  openModal(`<div class="modal-title">Edit Task</div>${taskFormHTML(t)}<div class="modal-actions">${t.status!=='Done'&&t.projectId?`<button class="btn btn-ghost" style="color:var(--green);margin-right:auto" onclick="promoteTask(${id})">→ Add to project</button>`:'<div style="flex:1"></div>'}<button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveTaskEdit(${id})">Save</button></div>`);
+  const t=DATA.tasks.find(x=>x.id===id); if(!t) return;
+  openModal(`<div class="modal-title">Edit Task</div>${taskFormHTML(t)}<div class="modal-actions">${t.status!=='Done'&&t.projectId?`<button class="btn btn-ghost" style="color:var(--green);margin-right:auto" onclick="promoteTask(${id})">✓ Done → deliverable</button>`:'<div style="flex:1"></div>'}<button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveTaskEdit(${id})">Save</button></div>`);
 }
 function saveTaskEdit(id) {
-  const pv=document.getElementById('tk-proj').value;
-  const body={ task:document.getElementById('tk-task').value, category:document.getElementById('tk-cat').value, assignee:document.getElementById('tk-assign').value, dueDate:document.getElementById('tk-due').value, priority:document.getElementById('tk-prio').value, status:document.getElementById('tk-status').value, driveLink:document.getElementById('tk-drive').value, projectId:pv?parseInt(pv):null, note:document.getElementById('tk-note').value };
-  mutate(()=>API.updateTask(id, body), ()=>{ closeModal(); renderTasks(); });
+  const body=taskFormBody(); if(!body.task){ alert('Enter a task.'); return; }
+  mutate(()=>API.updateTask(id, body), ()=>{ closeModal(); rerender(); });
 }
-function deleteTask(id) { if(!confirm('Delete this task?')) return; mutate(()=>API.deleteTask(id), renderTasks); }
-function quickDone(id) { mutate(()=>API.updateTask(id,{status:'Done'}), renderTasks); }
+function deleteTask(id) { if(!confirm('Delete this task?')) return; mutate(()=>API.deleteTask(id), rerender); }
+function moveTask(id, status) { mutate(()=>API.updateTask(id,{status}), rerender); }
 function promoteTask(id) {
-  const t=DATA.tasks.find(x=>x.id===id); if(!t||!t.projectId) return;
-  const p=DATA.projects.find(x=>x.id===t.projectId); if(!p) return;
+  const t=DATA.tasks.find(x=>x.id===id); if(!t) return;
+  if(!t.projectId) { moveTask(id,'Done'); return; }
+  const p=DATA.projects.find(x=>x.id===t.projectId); if(!p) { moveTask(id,'Done'); return; }
+  const exists=(p.deliverables||[]).some(d=>(d.text||'').trim().toLowerCase()===(t.task||'').trim().toLowerCase());
   const dels=[...(p.deliverables||[]), {text:t.task, driveLink:t.driveLink||''}];
-  mutate(async()=>{ await API.updateProject(p.id,{deliverables:dels}); await API.updateTask(id,{status:'Done'}); },
-    ()=>{ closeModal(); alert(`Added to "${p.name}" deliverables.`); renderTasks(); });
+  mutate(async()=>{ if(!exists) await API.updateProject(p.id,{deliverables:dels}); await API.updateTask(id,{status:'Done'}); },
+    ()=>{ closeModal(); rerender(); });
 }
+
+// Activity-log popup for a task.
+function taskLogModal(id) {
+  const t=DATA.tasks.find(x=>x.id===id); if(!t) return;
+  const canEdit=currentUser!=='client';
+  const proj=t.projectId?DATA.projects.find(p=>p.id===t.projectId):null;
+  const entries=(t.log||[]).map((e,i)=>({e,i})).reverse().map(({e,i})=>`<div style="display:flex;gap:8px;padding:8px 0;border-bottom:1px solid var(--light)">
+      <div style="flex:1"><div style="font-size:11px;color:var(--muted)">${esc(fmtTs(e.at))}</div><div style="font-size:13px;line-height:1.5;white-space:pre-wrap">${esc(e.action)}</div></div>
+      ${canEdit?`<button class="btn btn-sm btn-ghost" style="color:var(--red)" onclick="deleteTaskLogEntry(${id},${i})">✕</button>`:''}
+    </div>`).join('');
+  openModal(`<div class="modal-title">🗒 ${esc(t.task)}</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px;font-size:12px;color:var(--muted)">
+      ${statusBadge(t.status)}${proj?`<span>📁 ${esc(proj.name)}</span>`:''}${t.assignee?`<span>👤 ${esc(t.assignee)}</span>`:''}${taskTimeline(t)?`<span>🗓 ${taskTimeline(t)}</span>`:''}
+    </div>
+    <div class="modal-field"><label>Next Steps / Pending</label>${canEdit?`<textarea id="tl-next" rows="2" placeholder="What's next…">${esc(t.nextSteps||'')}</textarea><button class="btn btn-sm btn-outline" style="margin-top:6px" onclick="saveNextSteps(${id})">Save next steps</button>`:`<div style="font-size:13px;white-space:pre-wrap">${esc(t.nextSteps||'—')}</div>`}</div>
+    <div class="modal-field"><label>Activity Log</label>
+      ${canEdit?`<div style="display:flex;gap:8px;margin-bottom:10px"><input type="text" id="tl-action" placeholder="What did you do? (time added automatically)" style="flex:1;border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;outline:none" onkeydown="if(event.key==='Enter')addTaskLogEntry(${id})"><button class="btn btn-primary" onclick="addTaskLogEntry(${id})">Add</button></div>`:''}
+      <div>${entries||'<div style="color:var(--muted);font-style:italic;font-size:13px">No log entries yet.</div>'}</div>
+    </div>
+    <div class="modal-actions">${canEdit?`<button class="btn btn-ghost" style="margin-right:auto" onclick="editTaskModal(${id})">✎ Edit task</button>`:''}<button class="btn btn-outline" onclick="closeModal()">Close</button></div>`);
+}
+function addTaskLogEntry(id) { const el=document.getElementById('tl-action'); const action=el.value.trim(); if(!action) return; mutate(()=>API.addTaskLog(id,action), ()=>taskLogModal(id)); }
+function deleteTaskLogEntry(id, ix) { if(!confirm('Remove this log entry?')) return; mutate(()=>API.deleteTaskLog(id,ix), ()=>taskLogModal(id)); }
+function saveNextSteps(id) { const v=document.getElementById('tl-next').value; mutate(()=>API.updateTask(id,{nextSteps:v}), ()=>taskLogModal(id)); }
 
 // ── Manage Assignees ──────────────────────────────────────
 function manageAssigneesModal() {
@@ -1204,6 +1328,7 @@ function renderSummaries(mon) {
       p.deliverables.forEach(d=>{ html+=`<div style="display:flex;align-items:flex-start;gap:8px;padding:5px 0;border-bottom:1px solid var(--light)"><div style="color:var(--blue);font-size:14px;flex-shrink:0;margin-top:1px">›</div><div style="font-size:13px;flex:1">${d.text}${d.driveLink?` <a href="${d.driveLink}" target="_blank" class="drive-link" style="margin-left:6px">📁</a>`:''}</div></div>`; });
       html+=`</div>`;
     }
+    html+=taskBoardHTML(p.id);
     html+=linkedReportsHTML(p.id);
     html+=`</div>`;
   });
@@ -1240,7 +1365,7 @@ function renderClientSummary(mon) {
     } else {
       html+=`<div style="color:var(--muted);font-style:italic;font-size:13px;padding:8px 0">Deliverables to be confirmed.</div>`;
     }
-    html+=`</div>${linkedReportsHTML(p.id)}</div>`;
+    html+=`</div>${taskBoardHTML(p.id,{readonly:true})}${linkedReportsHTML(p.id)}</div>`;
   });
 
   if (projects.some(p=>p.value!=null)) {

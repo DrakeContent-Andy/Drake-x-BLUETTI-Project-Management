@@ -24,15 +24,17 @@ export function mapProject(r, includeValue) {
 export function mapTask(r) {
   return {
     id: r.id,
-    category: r.category,
     task: r.task,
     projectId: r.project_id,
     assignee: r.assignee || '',
+    startDate: r.start_date || '',
     dueDate: r.due_date || '',
     status: r.status,
     priority: r.priority,
     driveLink: r.drive_link || '',
     note: r.note || '',
+    nextSteps: r.next_steps || '',
+    log: Array.isArray(r.log) ? r.log : [],
   };
 }
 
@@ -92,14 +94,24 @@ export async function loadState(role) {
     reports = reports.filter((r) => !r.projectId || visibleIds.has(r.projectId));
   }
 
-  if (role !== 'client') {
-    const taskQ = await pool.query(
-      `SELECT id, category, task, project_id, assignee,
-              to_char(due_date,'YYYY-MM-DD') AS due_date, status, priority, drive_link, note
-         FROM tasks ORDER BY id`
-    );
-    tasks = taskQ.rows.map(mapTask);
+  // Tasks (the progress board) are visible to everyone, including the client.
+  const taskQ = await pool.query(
+    `SELECT id, task, project_id, assignee,
+            to_char(start_date,'YYYY-MM-DD') AS start_date,
+            to_char(due_date,'YYYY-MM-DD') AS due_date,
+            status, priority, drive_link, note, next_steps, log
+       FROM tasks ORDER BY id`
+  );
+  tasks = taskQ.rows.map(mapTask);
+  if (role === 'client') {
+    // Only tasks tied to a project the client can see, and strip the internal note.
+    const visibleIds = new Set(projects.map((p) => p.id));
+    tasks = tasks
+      .filter((t) => t.projectId && visibleIds.has(t.projectId))
+      .map((t) => ({ ...t, note: '' }));
+  }
 
+  if (role !== 'client') {
     const planQ = await pool.query(
       `SELECT id, month, project_name, note, options FROM plans ORDER BY sort_order, id`
     );

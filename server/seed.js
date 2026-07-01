@@ -71,23 +71,8 @@ const PROJECTS = [
   ], note:'', showClient:true },
 ];
 
-const TASKS = [
-  { id:1, category:'Shoot Plan', task:'Terrence Alfred EP2000 — Post-Production Edit', projectId:6, assignee:'Luke', dueDate:'2026-05-20', status:'In Progress', priority:'High', driveLink:'', note:'Full interview cut + B-roll assembly. Brand elements, subtitles, colour grade. Deliver master file and social cutdowns.' },
-  { id:2, category:'Shoot Plan', task:'Anil Sudhakar Rao EP2000 — Post-Production Edit', projectId:7, assignee:'Luke', dueDate:'2026-05-22', status:'In Progress', priority:'High', driveLink:'', note:'Same treatment as Terrence. Cutdowns for Instagram Reel + YouTube long form.' },
-  { id:3, category:'Shoot Plan', task:'Sydney Installation Case Study — Final Cut Delivery', projectId:8, assignee:'Luke', dueDate:'2026-05-25', status:'In Progress', priority:'High', driveLink:'', note:'Case study format. Include install footage. Deliver to client for approval.' },
-  { id:4, category:'Shoot Plan', task:'Plan June shoot — new KOC subject sourcing', projectId:null, assignee:'Andy', dueDate:'2026-05-30', status:'To Do', priority:'Medium', driveLink:'', note:'Identify next KOC candidate for June shoot. Confirm product (EP760 or EP2000). Brief Martin on logistics.' },
-  { id:5, category:'KOC', task:'Dispatch product gift — Terrence Alfred (Elite 30 V2 x2)', projectId:6, assignee:'Martin', dueDate:'2026-05-15', status:'To Do', priority:'High', driveLink:'', note:'Coordinate dispatch with Bluetti. Confirm delivery address and tracking.' },
-  { id:6, category:'KOC', task:'Obtain usage agreement — Terrence Alfred', projectId:6, assignee:'Andy', dueDate:'2026-05-18', status:'To Do', priority:'High', driveLink:'', note:'Send agreement doc. Follow up if not signed within 5 days.' },
-  { id:7, category:'KOC', task:'Dispatch product gift — Anil Sudhakar Rao (Portable ~$300)', projectId:7, assignee:'Martin', dueDate:'2026-05-15', status:'To Do', priority:'Medium', driveLink:'', note:'' },
-  { id:8, category:'KOL', task:'Neerav Bhatt — finalise rate card and contract', projectId:null, assignee:'Andy', dueDate:'2026-05-20', status:'In Progress', priority:'High', driveLink:'', note:'Full package AUD $6,500+GST. LinkedIn co-post included. Send contract for signature.' },
-  { id:9, category:'KOL', task:'TechManPat (Patryk) — follow up on proposal', projectId:null, assignee:'Andy', dueDate:'2026-05-22', status:'To Do', priority:'Medium', driveLink:'', note:'Option B ($2,500+GST) recommended.' },
-  { id:10, category:'PR', task:'Smart Energy Expo — gather post-event coverage metrics', projectId:null, assignee:'Andy', dueDate:'2026-05-18', status:'To Do', priority:'Medium', driveLink:'', note:'Collect reach, impressions, views data for all expo-related posts.' },
-  { id:11, category:'Social Media', task:'Schedule May Week 3 LinkedIn posts', projectId:null, assignee:'Luke', dueDate:'2026-05-15', status:'To Do', priority:'High', driveLink:'', note:'Smart Energy Expo Wrap-up + Steve 3-Month Review. Get copy approved first.' },
-  { id:12, category:'Social Media', task:'Draft copy for Terrence social posts (pre-edit)', projectId:6, assignee:'Luke', dueDate:'2026-05-18', status:'To Do', priority:'Medium', driveLink:'', note:'Write 3 caption options for each social cutdown. Include hashtags.' },
-  { id:13, category:'Creative', task:'Pack003 — design static creatives', projectId:null, assignee:'Maverick', dueDate:'2026-05-24', status:'In Progress', priority:'High', driveLink:'', note:'Video asset included this pack. 15-sec real bill vs BLUETTI bill comparison.' },
-  { id:14, category:'General', task:'Prepare Month 5 invoice', projectId:null, assignee:'Andy', dueDate:'2026-05-30', status:'To Do', priority:'High', driveLink:'', note:'' },
-  { id:15, category:'General', task:'Monthly client report — May summary draft', projectId:null, assignee:'Andy', dueDate:'2026-05-30', status:'To Do', priority:'Medium', driveLink:'', note:'' },
-];
+// Tasks start empty — the new project-centric progress board is populated in-app.
+const TASKS = [];
 
 const GOALS = [
   { month:'May 2026', category:'Testimonial', description:'Complete post-production on all 3 April shoots (Terrence, Anil, Sydney)', target:'3 edits' },
@@ -135,12 +120,14 @@ export async function seedIfEmpty() {
 
   for (const t of TASKS) {
     await pool.query(
-      `INSERT INTO tasks (id, category, task, project_id, assignee, due_date, status, priority, drive_link, note)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
-      [t.id, t.category, t.task, t.projectId, t.assignee, t.dueDate || null, t.status, t.priority, t.driveLink, t.note]
+      `INSERT INTO tasks (id, task, project_id, assignee, start_date, due_date, status, priority, drive_link, note, next_steps)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+      [t.id, t.task, t.projectId, t.assignee, t.startDate || null, t.dueDate || null, t.status, t.priority, t.driveLink, t.note, t.nextSteps || '']
     );
   }
-  await pool.query(`SELECT setval('tasks_id_seq', (SELECT MAX(id) FROM tasks))`);
+  if (TASKS.length) {
+    await pool.query(`SELECT setval('tasks_id_seq', (SELECT MAX(id) FROM tasks))`);
+  }
 
   for (const g of GOALS) {
     await pool.query(
