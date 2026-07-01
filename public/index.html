@@ -189,6 +189,7 @@ tr:hover td{background:#fafafa}
 .task-board{display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start}
 .task-card{border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:10px;background:#fff}
 .task-card-overdue{border-color:var(--red);background:#fef2f2}
+.task-bubble{display:flex;align-items:center;gap:6px;font-size:12px;line-height:1.4;background:#fff;border:1px solid var(--border);border-radius:10px;padding:6px 10px;margin-bottom:6px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
 </style>
 </head>
 <body>
@@ -309,7 +310,7 @@ const API = {
   createTask(b)        { return API.req('POST', '/tasks', b); },
   updateTask(id, b)    { return API.req('PATCH', '/tasks/' + id, b); },
   deleteTask(id)       { return API.req('DELETE', '/tasks/' + id); },
-  addTaskLog(id, action){ return API.req('POST', '/tasks/' + id + '/log', { action }); },
+  addTaskLog(id, action, at){ return API.req('POST', '/tasks/' + id + '/log', at ? { action, at } : { action }); },
   deleteTaskLog(id, ix){ return API.req('DELETE', '/tasks/' + id + '/log/' + ix); },
   createPlan(b)        { return API.req('POST', '/plans', b); },
   updatePlan(id, b)    { return API.req('PATCH', '/plans/' + id, b); },
@@ -974,7 +975,7 @@ function taskCardHTML(t, opts) {
         ${tl?`<span style="${od?'color:var(--red);font-weight:700':''}">🗓 ${tl}</span>`:''}
       </div>
     </div>
-    ${t.nextSteps?`<div style="font-size:11px;color:#334155;margin-top:6px;background:var(--light);border-radius:6px;padding:5px 8px"><b>Next:</b> ${esc(t.nextSteps)}</div>`:''}
+    ${t.description?`<div style="font-size:11px;color:#334155;margin-top:6px;background:var(--light);border-radius:6px;padding:5px 8px;white-space:pre-wrap">${esc(t.description)}</div>`:''}
     <div style="display:flex;gap:5px;align-items:center;margin-top:8px;flex-wrap:wrap">
       <button class="btn btn-sm btn-ghost" onclick="taskLogModal(${t.id})" style="font-size:11px">🗒 Log${logN?' ('+logN+')':''}</button>
       ${t.driveLink?`<a href="${esc(t.driveLink)}" target="_blank" class="drive-link" style="font-size:11px">📁 Files</a>`:''}
@@ -1033,20 +1034,38 @@ function taskBoardHTML(pid, opts) {
   const canEdit=!opts.readonly && currentUser!=='client';
   const todo=sortTasks(list.filter(t=>t.status==='To Do'));
   const prog=sortTasks(list.filter(t=>t.status==='In Progress'));
-  if(!todo.length && !prog.length && !canEdit) return '';
-  const row=(t)=>`<div style="display:flex;align-items:center;gap:6px;padding:3px 0">
-      <span style="flex:1;min-width:0;font-size:12px;cursor:pointer" onclick="taskLogModal(${t.id})">${esc(t.task)}${(t.log||[]).length?` <span style="color:var(--muted)">🗒${(t.log||[]).length}</span>`:''}</span>
+  const parked=sortTasks(list.filter(t=>t.status==='On Hold'||t.status==='Void'));
+  if(!todo.length && !prog.length && !parked.length && !canEdit) return '';
+  const bubble=(t,color)=>`<div class="task-bubble" style="border-left:3px solid ${color}">
+      <span style="flex:1;min-width:0;cursor:pointer" onclick="taskLogModal(${t.id})">${esc(t.task)}${(t.log||[]).length?` <span style="color:var(--muted);font-size:10px">🗒${(t.log||[]).length}</span>`:''}</span>
       ${canEdit&&t.status==='To Do'?`<button class="btn btn-sm btn-ghost" title="Start" onclick="moveTask(${t.id},'In Progress')">▶</button>`:''}
-      ${canEdit&&t.status!=='Done'?`<button class="btn btn-sm btn-ghost" style="color:var(--green)" title="Done → deliverable" onclick="promoteTask(${t.id})">✓</button>`:''}
+      ${canEdit&&t.status!=='Done'&&t.status!=='On Hold'&&t.status!=='Void'?`<button class="btn btn-sm btn-ghost" style="color:var(--green)" title="Done → deliverable" onclick="promoteTask(${t.id})">✓</button>`:''}
     </div>`;
-  const addBtn = (canEdit&&ids.length===1)?` <button class="btn btn-sm btn-ghost" style="font-size:11px" onclick="addTaskModal(${ids[0]})">+ Task</button>`:'';
-  return `<div style="padding:10px 18px 14px;border-top:1px solid var(--border);background:#fffbeb">
-    <div style="font-size:12px;font-weight:700;color:#b45309;margin-bottom:6px">📋 Progress${addBtn}</div>
+  const empty='<div style="font-size:11px;color:var(--muted);font-style:italic">—</div>';
+  const addBtn = (canEdit&&ids.length===1)?`<button class="btn btn-sm btn-ghost" style="font-size:11px;padding:1px 8px" title="Add a To Do task" onclick="addTaskModal(${ids[0]})">+ Task</button>`:'';
+  let h=`<div style="padding:10px 18px 14px;border-top:1px solid var(--border);background:#fffbeb">
     <div style="display:flex;gap:16px;flex-wrap:wrap">
-      <div style="flex:1;min-width:180px"><div style="font-size:11px;font-weight:700;color:#b45309;margin-bottom:2px">🟡 To Do (${todo.length})</div>${todo.length?todo.map(row).join(''):'<div style="font-size:11px;color:var(--muted);font-style:italic">—</div>'}</div>
-      <div style="flex:1;min-width:180px"><div style="font-size:11px;font-weight:700;color:#1d4ed8;margin-bottom:2px">🔵 In Progress (${prog.length})</div>${prog.length?prog.map(row).join(''):'<div style="font-size:11px;color:var(--muted);font-style:italic">—</div>'}</div>
-    </div>
+      <div style="flex:1;min-width:180px"><div style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:#b45309;margin-bottom:6px">🟡 To Do (${todo.length}) ${addBtn}</div>${todo.length?todo.map(t=>bubble(t,'#f59e0b')).join(''):empty}</div>
+      <div style="flex:1;min-width:180px"><div style="font-size:11px;font-weight:700;color:#1d4ed8;margin-bottom:6px">🔵 In Progress (${prog.length})</div>${prog.length?prog.map(t=>bubble(t,'#3b82f6')).join(''):empty}</div>
+    </div>`;
+  if(parked.length) h+=`<div style="margin-top:10px"><div style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:6px">⏸ On Hold / Stuck (${parked.length})</div>${parked.map(t=>bubble(t,'#94a3b8')).join('')}</div>`;
+  h+=`</div>`;
+  return h;
+}
+
+// Multi-line description helpers: stored as newline-joined text, edited as rows.
+function descLines(text) { const a=(text||'').split('\n').filter(x=>x.trim()!==''); return a.length?a:['']; }
+function descRowHTML(val) {
+  return `<div data-drow style="display:flex;gap:8px;margin-bottom:6px">
+    <input type="text" class="desc-in" value="${esc(val||'')}" placeholder="Add context / a detail…" style="flex:1;border:1.5px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;outline:none">
+    <button type="button" class="btn btn-sm btn-ghost" style="color:var(--red)" onclick="this.closest('[data-drow]').remove()">✕</button>
   </div>`;
+}
+function addDescRow(containerId) { document.getElementById(containerId).insertAdjacentHTML('beforeend', descRowHTML('')); }
+function collectDesc(containerId) { return [...document.querySelectorAll('#'+containerId+' [data-drow] .desc-in')].map(i=>i.value.trim()).filter(Boolean).join('\n'); }
+function descBlockHTML(containerId, text) {
+  return `<div id="${containerId}">${descLines(text).map(l=>descRowHTML(l)).join('')}</div>
+    <button type="button" class="btn btn-sm btn-outline" style="margin-top:6px" onclick="addDescRow('${containerId}')">+ Add line</button>`;
 }
 
 function taskFormHTML(t, prePid) {
@@ -1064,7 +1083,7 @@ function taskFormHTML(t, prePid) {
       <div class="modal-field"><label>Due Date</label><input type="date" id="tk-due" value="${t&&t.dueDate||''}"></div>
     </div>
     <div class="modal-field"><label>Status</label><select id="tk-status">${['To Do','In Progress','Done','On Hold','Void'].map(s=>`<option value="${s}" ${(t?t.status:'To Do')===s?'selected':''}>${s}</option>`).join('')}</select></div>
-    <div class="modal-field"><label>Next Steps <span style="font-weight:400;color:var(--muted)">(what's pending — visible to client)</span></label><textarea id="tk-next" rows="2" placeholder="What happens next…">${esc(t&&t.nextSteps||'')}</textarea></div>
+    <div class="modal-field"><label>Description / Context <span style="font-weight:400;color:var(--muted)">(extra detail — visible to client)</span></label>${descBlockHTML('tk-desc', t&&t.description)}</div>
     <div class="modal-field"><label>Google Drive Link <span style="font-weight:400;color:var(--muted)">(optional)</span></label><input type="url" id="tk-drive" value="${esc(t&&t.driveLink||'')}" placeholder="https://drive.google.com/..."></div>
     <div class="modal-field"><label>Internal Note <span style="font-weight:400;color:var(--muted)">(Drake only — not shown to client)</span></label><textarea id="tk-note" rows="3" placeholder="Any internal context…">${esc(t&&t.note||'')}</textarea></div>`;
 }
@@ -1080,7 +1099,7 @@ function taskFormBody() {
     dueDate:document.getElementById('tk-due').value,
     priority:document.getElementById('tk-prio').value,
     status:document.getElementById('tk-status').value,
-    nextSteps:document.getElementById('tk-next').value,
+    description:collectDesc('tk-desc'),
     driveLink:document.getElementById('tk-drive').value,
     note:document.getElementById('tk-note').value,
   };
@@ -1122,16 +1141,22 @@ function taskLogModal(id) {
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px;font-size:12px;color:var(--muted)">
       ${statusBadge(t.status)}${proj?`<span>📁 ${esc(proj.name)}</span>`:''}${t.assignee?`<span>👤 ${esc(t.assignee)}</span>`:''}${taskTimeline(t)?`<span>🗓 ${taskTimeline(t)}</span>`:''}
     </div>
-    <div class="modal-field"><label>Next Steps / Pending</label>${canEdit?`<textarea id="tl-next" rows="2" placeholder="What's next…">${esc(t.nextSteps||'')}</textarea><button class="btn btn-sm btn-outline" style="margin-top:6px" onclick="saveNextSteps(${id})">Save next steps</button>`:`<div style="font-size:13px;white-space:pre-wrap">${esc(t.nextSteps||'—')}</div>`}</div>
+    <div class="modal-field"><label>Description / Context</label>${canEdit?`${descBlockHTML('tl-desc', t.description)} <button class="btn btn-sm btn-primary" style="margin-top:6px" onclick="saveDesc(${id})">Save</button>`:`<div style="font-size:13px;white-space:pre-wrap">${esc(t.description||'—')}</div>`}</div>
     <div class="modal-field"><label>Activity Log</label>
-      ${canEdit?`<div style="display:flex;gap:8px;margin-bottom:10px"><input type="text" id="tl-action" placeholder="What did you do? (time added automatically)" style="flex:1;border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;outline:none" onkeydown="if(event.key==='Enter')addTaskLogEntry(${id})"><button class="btn btn-primary" onclick="addTaskLogEntry(${id})">Add</button></div>`:''}
+      ${canEdit?`<div style="display:flex;gap:8px;margin-bottom:6px"><input type="text" id="tl-action" placeholder="What did you do?" style="flex:1;border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;outline:none" onkeydown="if(event.key==='Enter')addTaskLogEntry(${id})"><button class="btn btn-primary" onclick="addTaskLogEntry(${id})">Add</button></div>
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;font-size:11px;color:var(--muted)"><span>When:</span><input type="datetime-local" id="tl-at" style="border:1.5px solid var(--border);border-radius:8px;padding:5px 8px;font-size:12px;outline:none"><span>leave blank = now</span></div>`:''}
       <div>${entries||'<div style="color:var(--muted);font-style:italic;font-size:13px">No log entries yet.</div>'}</div>
     </div>
     <div class="modal-actions">${canEdit?`<button class="btn btn-ghost" style="margin-right:auto" onclick="editTaskModal(${id})">✎ Edit task</button>`:''}<button class="btn btn-outline" onclick="closeModal()">Close</button></div>`);
 }
-function addTaskLogEntry(id) { const el=document.getElementById('tl-action'); const action=el.value.trim(); if(!action) return; mutate(()=>API.addTaskLog(id,action), ()=>taskLogModal(id)); }
+function addTaskLogEntry(id) {
+  const action=document.getElementById('tl-action').value.trim(); if(!action) return;
+  const atEl=document.getElementById('tl-at');
+  let at; if(atEl&&atEl.value){ const d=new Date(atEl.value); if(!isNaN(d.getTime())) at=d.toISOString(); }
+  mutate(()=>API.addTaskLog(id,action,at), ()=>taskLogModal(id));
+}
 function deleteTaskLogEntry(id, ix) { if(!confirm('Remove this log entry?')) return; mutate(()=>API.deleteTaskLog(id,ix), ()=>taskLogModal(id)); }
-function saveNextSteps(id) { const v=document.getElementById('tl-next').value; mutate(()=>API.updateTask(id,{nextSteps:v}), ()=>taskLogModal(id)); }
+function saveDesc(id) { mutate(()=>API.updateTask(id,{description:collectDesc('tl-desc')}), ()=>taskLogModal(id)); }
 
 // ── Manage Assignees ──────────────────────────────────────
 function manageAssigneesModal() {

@@ -120,9 +120,9 @@ export async function seedIfEmpty() {
 
   for (const t of TASKS) {
     await pool.query(
-      `INSERT INTO tasks (id, task, project_id, assignee, start_date, due_date, status, priority, drive_link, note, next_steps)
+      `INSERT INTO tasks (id, task, project_id, assignee, start_date, due_date, status, priority, drive_link, note, description)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
-      [t.id, t.task, t.projectId, t.assignee, t.startDate || null, t.dueDate || null, t.status, t.priority, t.driveLink, t.note, t.nextSteps || '']
+      [t.id, t.task, t.projectId, t.assignee, t.startDate || null, t.dueDate || null, t.status, t.priority, t.driveLink, t.note, t.description || '']
     );
   }
   if (TASKS.length) {

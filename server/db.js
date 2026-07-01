@@ -47,7 +47,7 @@ export async function initSchema() {
       priority    TEXT DEFAULT 'Medium',
       drive_link  TEXT DEFAULT '',
       note        TEXT DEFAULT '',
-      next_steps  TEXT DEFAULT '',
+      description TEXT DEFAULT '',
       log         JSONB DEFAULT '[]'::jsonb
     );
 
@@ -97,10 +97,11 @@ export async function initSchema() {
     );
 
     -- Tasks are now a project-centric progress board: drop the old category,
-    -- add an expected start date, next-steps, and a timestamped activity log.
+    -- add an expected start date, a description, and a timestamped activity log.
     ALTER TABLE tasks DROP COLUMN IF EXISTS category;
+    ALTER TABLE tasks DROP COLUMN IF EXISTS next_steps;
     ALTER TABLE tasks ADD COLUMN IF NOT EXISTS start_date DATE;
-    ALTER TABLE tasks ADD COLUMN IF NOT EXISTS next_steps TEXT DEFAULT '';
+    ALTER TABLE tasks ADD COLUMN IF NOT EXISTS description TEXT DEFAULT '';
     ALTER TABLE tasks ADD COLUMN IF NOT EXISTS log JSONB DEFAULT '[]'::jsonb;
   `);
 

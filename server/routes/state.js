@@ -33,7 +33,7 @@ export function mapTask(r) {
     priority: r.priority,
     driveLink: r.drive_link || '',
     note: r.note || '',
-    nextSteps: r.next_steps || '',
+    description: r.description || '',
     log: Array.isArray(r.log) ? r.log : [],
   };
 }
@@ -99,7 +99,7 @@ export async function loadState(role) {
     `SELECT id, task, project_id, assignee,
             to_char(start_date,'YYYY-MM-DD') AS start_date,
             to_char(due_date,'YYYY-MM-DD') AS due_date,
-            status, priority, drive_link, note, next_steps, log
+            status, priority, drive_link, note, description, log
        FROM tasks ORDER BY id`
   );
   tasks = taskQ.rows.map(mapTask);
